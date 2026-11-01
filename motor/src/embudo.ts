@@ -1,5 +1,6 @@
 import { diasNaturalesEntre, sumarDiasNaturales } from './fechas.js';
 import { cicloMeses } from './oportunidad.js';
+import { esAltaOMedia, tieneTR } from './reglas/helpers.js';
 import { fechaValida } from './validar.js';
 import type { Config, Expediente, NivelEmbudo } from './tipos.js';
 
@@ -18,12 +19,13 @@ export function nivelEmbudo(exp: Expediente, hoy: string, config: Config): Nivel
 
   const hayEconomicoContactado = influencias.some((i) => i.roles.includes('E') && i.contactada);
   const todasContactadas = influencias.length > 0 && influencias.every((i) => i.contactada);
-  const altasYMediasConTR = influencias
-    .filter((i) => i.grado === 'A' || i.grado === 'M')
-    .every((i) => i.trDeclaracion !== null);
+  const altasYMediasConTR = influencias.filter(esAltaOMedia).every(tieneTR);
   const medioCiclo = Math.round((cicloMeses(exp, config) * 30) / 2);
+  // Una fecha vencida (anterior a hoy) nunca es "cercana".
   const cierreCercano =
-    exp.fechaCierreCRM !== null && exp.fechaCierreCRM <= sumarDiasNaturales(hoy, medioCiclo);
+    exp.fechaCierreCRM !== null &&
+    exp.fechaCierreCRM >= hoy &&
+    exp.fechaCierreCRM <= sumarDiasNaturales(hoy, medioCiclo);
 
   if (hayEconomicoContactado && todasContactadas && altasYMediasConTR && exp.cadena.pasos.aElegido && cierreCercano) {
     return 'pocos_selectos';

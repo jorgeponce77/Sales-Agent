@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CONFIG_DEFAULT } from '../src/config.js';
 import { construirContexto } from '../src/contexto.js';
@@ -365,5 +367,33 @@ describe('esCoachValido', () => {
     expect(esCoachValido(influenciaBase({ roles: ['C'], calificacion: 4, modo: 'E' }))).toBe(false);
     expect(esCoachValido(influenciaBase({ roles: ['C'], calificacion: 4, modo: 'EC' }))).toBe(false);
     expect(esCoachValido(influenciaBase({ roles: ['C'], calificacion: 4, modo: null }))).toBe(false);
+  });
+});
+
+describe('redacción de los textos (M7)', () => {
+  const textoDe = (id: string): string => {
+    const caso = CASOS.find((c) => c.id === id);
+    if (!caso) throw new Error(`sin caso para ${id}`);
+    return evaluar(id, caso.activa) ?? '';
+  };
+
+  it.each(['ce_incompleto', 'cierre_despues_ce', 'urgente_sin_ce'])(
+    '%s dice "compelling event", no "evento convincente"', (id) => {
+      const texto = textoDe(id);
+      expect(texto).toContain('compelling event');
+      expect(texto).not.toContain('evento convincente');
+    });
+
+  it('rfp_sin_contacto_previo habla de confirmación de contacto previo con las influencias', () => {
+    expect(textoDe('rfp_sin_contacto_previo')).toContain('no hay confirmación de contacto previo con las influencias');
+  });
+
+  it('ni el código ni el LEEME de los casos de George dicen "evento convincente"', () => {
+    const rutas = ['../src/reglas/altas.ts', '../src/reglas/medias.ts', '../src/reglas/criticas.ts', '../src/reglas/fortalezas.ts',
+      './golden/LEEME.md', './golden/casos/ejemplo-01-cierre-inflado.json', './golden/casos/ejemplo-02-sano.json'];
+    for (const ruta of rutas) {
+      const contenido = readFileSync(fileURLToPath(new URL(ruta, import.meta.url)), 'utf-8');
+      expect(contenido, ruta).not.toMatch(/evento convincente/i);
+    }
   });
 });

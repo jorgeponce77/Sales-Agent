@@ -123,6 +123,26 @@ describe('nivelEmbudo', () => {
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('pocos_selectos');
   });
 
+  it('TR_en_blanco_en_grado_A_impide_pocos_selectos (M1)', () => {
+    const exp = expedienteBase({
+      fechaCierreCRM: '2027-03-02',
+      cadena: { pasos: { aElegido: true } },
+      influencias: [influenciaBase({ trDeclaracion: '   ' })],
+    });
+    expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
+  });
+
+  it('fecha_de_cierre_vencida_nunca_es_pocos_selectos (M2)', () => {
+    const base = {
+      cadena: { pasos: { aElegido: true } },
+      influencias: [influenciaBase()],
+    };
+    expect(nivelEmbudo(expedienteBase({ ...base, fechaCierreCRM: '2026-10-01' }), HOY, CONFIG_DEFAULT)).toBe('en_embudo');
+    expect(nivelEmbudo(expedienteBase({ ...base, fechaCierreCRM: '2026-11-01' }), HOY, CONFIG_DEFAULT)).toBe('en_embudo');
+    // hoy mismo sí cuenta
+    expect(nivelEmbudo(expedienteBase({ ...base, fechaCierreCRM: HOY }), HOY, CONFIG_DEFAULT)).toBe('pocos_selectos');
+  });
+
   it('proveedor_no_elegido_impide_pocos_selectos', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
@@ -161,7 +181,7 @@ describe('construirContexto', () => {
     expect(ctx.fechaOptimista).toBe(false);
   });
 
-  it('contexto_deriva_economicos_coaches_y_demas_campos', () => {
+  it('contexto_deriva_economicos_y_demas_campos', () => {
     const e = influenciaBase({ personaId: 'e1', roles: ['E'] });
     const c = influenciaBase({ personaId: 'c1', roles: ['C'] });
     const ec = influenciaBase({ personaId: 'ec1', roles: ['E', 'C'] });
@@ -182,6 +202,6 @@ describe('construirContexto', () => {
     expect(ctx.atorada).toBe(true);
     expect(ctx.embudo).toBe('en_embudo');
     expect(ctx.economicos.map((i) => i.personaId)).toEqual(['e1', 'ec1']);
-    expect(ctx.coaches.map((i) => i.personaId)).toEqual(['c1', 'ec1']);
+    expect('coaches' in ctx).toBe(false); // M5: el contexto ya no lleva el campo sin uso
   });
 });

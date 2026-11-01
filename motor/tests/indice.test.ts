@@ -122,8 +122,8 @@ describe('índice: influencias', () => {
     expect(calcular(exp).componentes.influencias).toBe(7);
   });
 
-  it('sin influencias solo suma los 2 de la ausencia de inconsistencia', () => {
-    expect(calcular(expedienteBase()).componentes.influencias).toBe(2);
+  it('sin influencias no suma nada: los 2 de "sin inconsistencias" exigen al menos una influencia (M3)', () => {
+    expect(calcular(expedienteBase()).componentes.influencias).toBe(0);
   });
 
   it('el Coach cuenta solo si es válido (calificación ≥ 3 y modo C o P)', () => {
@@ -155,11 +155,33 @@ describe('índice: influencias', () => {
     expect(calcular(exp).componentes.influencias).toBe(1 + 2);
   });
 
-  it('la bandera modo_calificacion_inconsistente quita los 2 puntos', () => {
-    const exp = expedienteSano();
-    const ctx = construirContexto(exp, HOY, CONFIG_DEFAULT);
-    const con = calcularIndice(ctx, [{ id: 'modo_calificacion_inconsistente', severidad: 'media', texto: 'x' }]);
-    expect(con.componentes.influencias).toBe(18);
+  it('una influencia en modo E o EC con calificación positiva quita los 2 puntos, sin depender de banderas (M3)', () => {
+    const sano = expedienteSano();
+    expect(calcular(sano).componentes.influencias).toBe(20);
+    for (const modo of ['E', 'EC'] as const) {
+      const exp = expedienteSano({
+        influencias: [
+          influenciaBase({ personaId: 'e', roles: ['E'] }),
+          influenciaBase({ personaId: 'c', roles: ['C', 'U'], modo: 'C' }),
+          influenciaBase({ personaId: 't', roles: ['T'], modo, calificacion: 2 }),
+        ],
+      });
+      expect(calcular(exp).componentes.influencias).toBe(18);
+      // El cálculo no lee la lista de banderas: sin ellas da lo mismo.
+      const ctx = construirContexto(exp, HOY, CONFIG_DEFAULT);
+      expect(calcularIndice(ctx, []).componentes.influencias).toBe(18);
+    }
+  });
+
+  it('modo E con calificación negativa o nula no es inconsistencia: conserva los 2 puntos (M3)', () => {
+    const exp = expedienteSano({
+      influencias: [
+        influenciaBase({ personaId: 'e', roles: ['E'] }),
+        influenciaBase({ personaId: 'c', roles: ['C', 'U'], modo: 'C' }),
+        influenciaBase({ personaId: 't', roles: ['T'], modo: 'E', calificacion: -2 }),
+      ],
+    });
+    expect(calcular(exp).componentes.influencias).toBe(20);
   });
 });
 

@@ -15,7 +15,7 @@ const PESO_GRADO: Record<Grado, number> = { A: 2, M: 1, B: 0.5 };
 const PUNTOS_POSICION: Record<Posicion, number> = { dominante: 5, nula: 5, compartida: 3, alternativa: 1 };
 const PUNTOS_CONTRIBUCION: Record<Nivel, number> = { confirmado: 2, supuesto: 1, ausente: 0 };
 
-function puntosInfluencias(ctx: Contexto, banderas: Bandera[]): number {
+function puntosInfluencias(ctx: Contexto): number {
   const { influencias } = ctx.exp;
   const contactadas = influencias.filter((i) => i.contactada).length;
   let puntos = 0;
@@ -24,7 +24,11 @@ function puntosInfluencias(ctx: Contexto, banderas: Bandera[]): number {
   if (influencias.some(esCoachValido)) puntos += 4;
   if (influencias.some((i) => i.roles.includes('U')) && influencias.some((i) => i.roles.includes('T'))) puntos += 3;
   if (influencias.length > 0) puntos += (contactadas / influencias.length) * 2;
-  if (!banderas.some((b) => b.id === 'modo_calificacion_inconsistente')) puntos += 2;
+  // "Sin inconsistencias": se calcula de las influencias, no de las banderas, y exige al menos una.
+  const inconsistente = influencias.some(
+    (i) => (i.modo === 'E' || i.modo === 'EC') && i.calificacion !== null && i.calificacion > 0,
+  );
+  if (influencias.length > 0 && !inconsistente) puntos += 2;
   return puntos;
 }
 
@@ -83,7 +87,7 @@ function puntosCoherencia(ctx: Contexto): number {
 export function calcularIndice(ctx: Contexto, banderas: Bandera[]): ResultadoIndice {
   const { config } = ctx;
   const crudo: Record<keyof Config['pesos'], number> = {
-    influencias: puntosInfluencias(ctx, banderas),
+    influencias: puntosInfluencias(ctx),
     bant: puntosBant(ctx),
     compellingEvent: puntosCompellingEvent(ctx),
     triunfoResultados: puntosTriunfoResultados(ctx),

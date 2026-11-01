@@ -6,6 +6,8 @@ import type { Bandera, Hueco, Severidad } from './tipos.js';
 const IDS_NO_SON_FALTA_DE_DATO: ReadonlySet<string> = new Set([
   'etapa_inflada_grave', 'etapa_inflada', 'atorada', 'no_cierra_fecha',
   'euforia_con_banderas', 'cierre_despues_ce', 'fecha_optimista',
+  // Hechos del cliente que el vendedor ya reportó, no información por recabar.
+  'reorganizacion', 'influencia_nueva_puesto', 'ce_urgencia_falsa',
 ]);
 
 const ORDEN_SEVERIDAD: Record<Severidad, number> = { critica: 0, alta: 1, media: 2 };

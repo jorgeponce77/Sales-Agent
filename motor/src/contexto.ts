@@ -24,7 +24,6 @@ export interface Contexto {
   embudo: NivelEmbudo;
   atorada: boolean;
   economicos: Influencia[];
-  coaches: Influencia[];
 }
 
 /**
@@ -60,6 +59,5 @@ export function construirContexto(original: Expediente, hoy: string, config: Con
     embudo: nivelEmbudo(exp, hoy, config),
     atorada: estaAtorada(exp, hoy, config),
     economicos: exp.influencias.filter((i) => i.roles.includes('E')),
-    coaches: exp.influencias.filter((i) => i.roles.includes('C')),
   };
 }

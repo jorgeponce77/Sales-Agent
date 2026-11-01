@@ -63,20 +63,20 @@ Algunas banderas solo se evalúan en una lente: **G** = solo gerente, **D** = so
 |---|---|
 | `bant_supuesto` | Algún elemento de BANT está solo en supuesto |
 | `bant_ausente` | Falta información de Authority, Need o Time |
-| `ce_incompleto` | Al evento convincente le falta confirmar fecha, dueño o costo de la inacción |
+| `ce_incompleto` | Al compelling event le falta confirmar fecha, dueño o costo de la inacción |
 | `ce_urgencia_falsa` | La urgencia del cliente parece falsa |
 | `sin_coach_valido` | No hay Coach válido (+3 o más, modo Crecimiento o Problema) |
 | `etapa_inflada` | La etapa del CRM está 1 etapa arriba de lo que sostienen los criterios |
 | `banco_una_pata` | Solo hay una Influencia contactada |
-| `rfp_sin_contacto_previo` (G) | Es un RFP sin contacto previo con el cliente |
+| `rfp_sin_contacto_previo` (G) | Es un RFP y no hay confirmación de contacto previo con las influencias |
 | `atorada` | Superó el ciclo normal de venta |
 | `sow_requerido_solo_oc` (D) | El cierre requiere SOW pero la ruta es solo con orden de compra |
 | `no_cierra_fecha` (D) | Los pasos pendientes de cierre no caben antes de la fecha del CRM |
 | `influencia_alta_no_contactada` | Hay una Influencia de grado alto sin contactar |
 | `sin_contribucion_diferenciadora` | No se identificó nuestra contribución diferenciadora |
 | `alternativas_no_identificadas` | No se ha preguntado por la competencia ni las alternativas |
-| `cierre_despues_ce` | La fecha de cierre es posterior a la del evento convincente |
-| `urgente_sin_ce` | El cliente dice que es urgente pero no hay evento convincente con fecha |
+| `cierre_despues_ce` | La fecha de cierre es posterior a la del compelling event |
+| `urgente_sin_ce` | El cliente dice que es urgente pero no hay compelling event con fecha |
 
 **Medias**
 

@@ -44,7 +44,7 @@ export const REGLAS_ALTAS: Regla[] = [
     lente: 'ambas',
     evaluar: (ctx) =>
       ceTieneElementosSinConfirmar(ctx) && !ctx.exp.compellingEvent.urgenciaFalsa
-        ? 'El evento convincente no está completo: falta confirmar fecha, dueño o costo de la inacción.'
+        ? 'El compelling event no está completo: falta confirmar fecha, dueño o costo de la inacción.'
         : null,
   },
   {
@@ -87,7 +87,7 @@ export const REGLAS_ALTAS: Regla[] = [
     lente: 'gerente',
     evaluar: (ctx) =>
       ctx.exp.esRFP && ctx.exp.contactoPrevioRFP !== true
-        ? 'Es un RFP y no hubo contacto previo con el cliente antes de recibirlo.'
+        ? 'Es un RFP y no hay confirmación de contacto previo con las influencias.'
         : null,
   },
   {
@@ -152,7 +152,7 @@ export const REGLAS_ALTAS: Regla[] = [
         fecha.valor !== null &&
         (fecha.nivel === 'confirmado' || fecha.nivel === 'supuesto') &&
         fechaCierreCRM > fecha.valor
-        ? `La fecha de cierre (${fechaCierreCRM}) es posterior a la fecha del evento convincente (${fecha.valor}).`
+        ? `La fecha de cierre (${fechaCierreCRM}) es posterior a la fecha del compelling event (${fecha.valor}).`
         : null;
     },
   },
@@ -162,7 +162,7 @@ export const REGLAS_ALTAS: Regla[] = [
     lente: 'ambas',
     evaluar: (ctx) =>
       ctx.exp.prioridad.valor === 'urgente' && ctx.exp.compellingEvent.fecha.nivel === 'ausente'
-        ? 'El cliente dice que es urgente, pero no hay un evento convincente con fecha.'
+        ? 'El cliente dice que es urgente, pero no hay un compelling event con fecha.'
         : null,
   },
 ];

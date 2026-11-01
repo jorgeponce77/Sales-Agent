@@ -28,6 +28,8 @@ describe('huecosPriorizados', () => {
     const excluidas = [
       'etapa_inflada_grave', 'etapa_inflada', 'atorada', 'no_cierra_fecha',
       'euforia_con_banderas', 'cierre_despues_ce', 'fecha_optimista',
+      // F3: hechos del cliente, no datos por recabar
+      'reorganizacion', 'influencia_nueva_puesto', 'ce_urgencia_falsa',
     ];
     const banderas = [...excluidas.map((id) => bandera(id, 'alta')), bandera('sin_economico', 'critica')];
     expect(huecosPriorizados(ctx, banderas).map((h) => h.reglaId)).toEqual(['sin_economico']);

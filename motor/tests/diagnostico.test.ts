@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG_DEFAULT } from '../src/config.js';
 import { calcularDiagnostico } from '../src/diagnostico.js';
 import type { Evidencia, Nivel } from '../src/tipos.js';
-import { expedienteBase } from './fabrica.js';
+import { expedienteBase, influenciaBase } from './fabrica.js';
 
 const ev = <T>(valor: T, nivel: Nivel = 'confirmado'): Evidencia<T> => ({ valor, nivel });
 
@@ -31,6 +31,7 @@ describe('calcularDiagnostico', () => {
     const exp = expedienteBase({
       etapaCRM: 5,
       cadena: { pasos: { hOC: true } },
+      influencias: [influenciaBase({ roles: ['U'], modo: 'C' })],
       bant: { budget: ev('b'), authority: ev('a'), need: ev('n'), time: ev('t') },
       compellingEvent: { fecha: ev('2026-12-15'), dueno: ev('D'), costoInaccion: ev('C') },
     });

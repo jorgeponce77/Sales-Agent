@@ -35,7 +35,17 @@ const CRITERIOS_ARGANO: CriterioArgano[] = [
   { etapaDesde: 4, clave: 'sow_enviado_firma', texto: 'El SOW fue enviado a firma' },
 ];
 
-export const CONFIG_DEFAULT: Config = {
+/** Congela el valor y todo lo que contiene (objetos y arreglos anidados). */
+function congelarProfundo<T>(valor: T): T {
+  if (typeof valor === 'object' && valor !== null && !Object.isFrozen(valor)) {
+    Object.values(valor).forEach(congelarProfundo);
+    Object.freeze(valor);
+  }
+  return valor;
+}
+
+/** Configuración por defecto, de solo lectura: para modificarla, clónala con `structuredClone`. */
+export const CONFIG_DEFAULT: Config = congelarProfundo({
   probabilidades: {
     NN: [0, 0, 20, 45, 85, 100],
     ENxT: [0, 0, 40, 65, 90, 100],
@@ -70,4 +80,4 @@ export const CONFIG_DEFAULT: Config = {
   caducidadContactoDias: 60,
   horizonteAccionesDias: 30,
   maxAcciones: 5,
-};
+});
