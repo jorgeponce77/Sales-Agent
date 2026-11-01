@@ -4,10 +4,9 @@ import { diasNaturalesEntre } from '../fechas.js';
 import type { Evidencia, Influencia } from '../tipos.js';
 import { REGLAS_ALTAS } from './altas.js';
 import { REGLAS_CRITICAS } from './criticas.js';
+import { esAltaOMedia, tieneTR } from './helpers.js';
 import { aplicaLente, type Regla } from './tipos.js';
 
-const tieneTR = (i: Influencia): boolean => i.trDeclaracion !== null && i.trDeclaracion.trim() !== '';
-const esAltaOMedia = (i: Influencia): boolean => i.grado === 'A' || i.grado === 'M';
 
 /** Evidencias que pueden caducar, con el nombre que se muestra al usuario. */
 function evidenciasConFecha(ctx: Contexto): { nombre: string; ev: Evidencia<unknown> }[] {

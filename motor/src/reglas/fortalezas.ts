@@ -1,15 +1,12 @@
 import type { Contexto } from '../contexto.js';
 import { posicionGeneral } from '../competencia.js';
-import type { Influencia } from '../tipos.js';
-import { esCoachValido } from './helpers.js';
+import { esAltaOMedia, esCoachValido, tieneTR } from './helpers.js';
 
 /** Una fortaleza del catálogo: `evaluar` devuelve el texto si se cumple, o null. */
 export interface ReglaFortaleza {
   id: string;
   evaluar(ctx: Contexto): string | null;
 }
-
-const esAltaOMedia = (i: Influencia): boolean => i.grado === 'A' || i.grado === 'M';
 
 export const REGLAS_FORTALEZAS: ReglaFortaleza[] = [
   {
@@ -61,7 +58,7 @@ export const REGLAS_FORTALEZAS: ReglaFortaleza[] = [
     id: 'tr_completos',
     evaluar: (ctx) => {
       const clave = ctx.exp.influencias.filter(esAltaOMedia);
-      return clave.length > 0 && clave.every((i) => i.trDeclaracion !== null && i.trDeclaracion.trim() !== '')
+      return clave.length > 0 && clave.every(tieneTR)
         ? 'Todas las Influencias de grado alto y medio tienen su Triunfo-Resultado redactado.'
         : null;
     },
