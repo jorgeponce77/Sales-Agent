@@ -1,0 +1,139 @@
+{
+  "nombre": "Ejemplo 01 - Cierre inflado: etapa 4 en el CRM pero el cliente aún no nos ha elegido",
+  "hoy": "2026-11-02",
+  "expediente": {
+    "id": "ejemplo-01",
+    "cuenta": {
+      "nombre": "Distribuidora Ejemplo",
+      "pais": "MX",
+      "esClienteNetlogistik": false,
+      "esClienteOtraTowerArgano": false,
+      "clienteIdeal": [
+        { "valor": 3, "nivel": "confirmado" },
+        { "valor": 2, "nivel": "confirmado" },
+        { "valor": 3, "nivel": "supuesto" },
+        { "valor": 2, "nivel": "supuesto" },
+        { "valor": 1, "nivel": "supuesto" }
+      ]
+    },
+    "lineas": ["WMS"],
+    "montoUSD": 600000,
+    "etapaCRM": 4,
+    "fechaCierreCRM": "2026-11-27",
+    "fechaCreacion": "2026-06-01",
+    "esChangeOrder": false,
+    "cambioDeDueno": false,
+    "esMercadoNuevo": false,
+    "revisionGerenteProxima": false,
+    "sensacion": "seguro",
+    "prioridad": { "valor": "activa", "nivel": "confirmado" },
+    "influencias": [
+      {
+        "personaId": "p1",
+        "nombre": "Laura Méndez (Directora de Operaciones)",
+        "roles": ["E"],
+        "grado": "A",
+        "modo": "P",
+        "calificacion": 3,
+        "contactada": true,
+        "ultimoContacto": "2026-10-20",
+        "nuevaEnPuesto": false,
+        "trDeclaracion": "Reducir 20% el costo por pedido surtido",
+        "prioridad": "activa"
+      },
+      {
+        "personaId": "p2",
+        "nombre": "Hugo Ríos (Gerente de Almacén)",
+        "roles": ["U", "C"],
+        "grado": "M",
+        "modo": "C",
+        "calificacion": 4,
+        "contactada": true,
+        "ultimoContacto": "2026-10-28",
+        "nuevaEnPuesto": false,
+        "trDeclaracion": "Eliminar errores de surtido",
+        "prioridad": "activa"
+      },
+      {
+        "personaId": "p3",
+        "nombre": "Sofía Leal (TI)",
+        "roles": ["T"],
+        "grado": "M",
+        "modo": "P",
+        "calificacion": 2,
+        "contactada": true,
+        "ultimoContacto": "2026-10-15",
+        "nuevaEnPuesto": false,
+        "trDeclaracion": "Integración limpia con su ERP",
+        "prioridad": "importante"
+      }
+    ],
+    "preguntaCompetenciaHecha": true,
+    "alternativas": [
+      { "tipo": "proveedor", "nombre": "Competidor A", "posicion": "compartida" }
+    ],
+    "contribucionDiferenciadora": { "valor": "Experiencia en operaciones similares", "nivel": "supuesto" },
+    "criteriosCompraDefinidos": true,
+    "esRFP": false,
+    "contactoPrevioRFP": null,
+    "reorganizacion": { "valor": false, "nivel": "supuesto" },
+    "bant": {
+      "budget": { "valor": "Presupuesto aprobado para 2026", "nivel": "supuesto" },
+      "authority": { "valor": "Directora de Operaciones decide", "nivel": "confirmado" },
+      "need": { "valor": "Almacén saturado", "nivel": "confirmado" },
+      "time": { "valor": "Quieren arrancar en enero", "nivel": "supuesto" }
+    },
+    "compellingEvent": {
+      "descripcion": "Apertura de un nuevo centro de distribución en enero",
+      "fecha": { "valor": "2027-01-15", "nivel": "supuesto" },
+      "dueno": { "valor": "Laura Méndez", "nivel": "confirmado" },
+      "costoInaccion": { "valor": "Operar el nuevo CEDIS en manual", "nivel": "supuesto" },
+      "urgenciaFalsa": false
+    },
+    "cadena": {
+      "ruta": "contrato",
+      "requiereSOW": true,
+      "pasos": {
+        "aElegido": false,
+        "bContratoEnviado": false,
+        "cComentariosRecibidos": false,
+        "dEnFirma": false,
+        "eFirmado": false,
+        "fAltaProveedor": false,
+        "hOC": false
+      }
+    },
+    "criteriosArgano": [
+      { "clave": "fuente_creible", "nivel": "confirmado" },
+      { "clave": "cliente_confirma_real", "nivel": "confirmado" },
+      { "clave": "alineada_estrategia_argano", "nivel": "confirmado" },
+      { "clave": "entiende_cliente_dolores", "nivel": "confirmado" },
+      { "clave": "volumen_presupuesto_aprox", "nivel": "confirmado" },
+      { "clave": "aprobacion_calificacion_presupuesto_cliente", "nivel": "confirmado" },
+      { "clave": "business_case_identificado", "nivel": "confirmado" },
+      { "clave": "confirma_recibir_propuesta", "nivel": "confirmado" },
+      { "clave": "propuesta_desarrollada", "nivel": "confirmado" },
+      { "clave": "requerimientos_refinados", "nivel": "confirmado" },
+      { "clave": "recursos_presupuesto_evaluados", "nivel": "confirmado" },
+      { "clave": "estrategia_delivery_refinada", "nivel": "confirmado" },
+      { "clave": "revenue_equipo_calendario", "nivel": "confirmado" },
+      { "clave": "aprobacion_interna_recursos_margen", "nivel": "confirmado" },
+      { "clave": "pr_aprobado", "nivel": "confirmado" },
+      { "clave": "propuesta_entregada", "nivel": "confirmado" },
+      { "clave": "sow_precios_finalizados", "nivel": "confirmado" },
+      { "clave": "staffing_request", "nivel": "confirmado" },
+      { "clave": "forecast_actualizado", "nivel": "confirmado" }
+    ],
+    "higieneCRM": {
+      "valores": true,
+      "actividades": true,
+      "etapas": false
+    },
+    "accionesPrevias": []
+  },
+  "esperado": {
+    "etapaRecomendada": 3,
+    "banderasIncluye": ["no_elegidos_cierre_periodo"],
+    "semaforo": "rojo"
+  }
+}

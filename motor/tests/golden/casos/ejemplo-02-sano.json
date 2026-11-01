@@ -1,0 +1,127 @@
+{
+  "nombre": "Ejemplo 02 - Sano: etapa 2 con influencias, BANT y evento convincente confirmados",
+  "hoy": "2026-11-02",
+  "expediente": {
+    "id": "ejemplo-02",
+    "cuenta": {
+      "nombre": "Retail Ejemplo",
+      "pais": "MX",
+      "esClienteNetlogistik": true,
+      "esClienteOtraTowerArgano": false,
+      "clienteIdeal": [
+        { "valor": 4, "nivel": "confirmado" },
+        { "valor": 4, "nivel": "confirmado" },
+        { "valor": 3, "nivel": "confirmado" },
+        { "valor": 4, "nivel": "confirmado" },
+        { "valor": 3, "nivel": "confirmado" }
+      ]
+    },
+    "lineas": ["WMS"],
+    "montoUSD": 450000,
+    "etapaCRM": 2,
+    "fechaCierreCRM": "2027-06-30",
+    "fechaCreacion": "2026-10-01",
+    "esChangeOrder": false,
+    "cambioDeDueno": false,
+    "esMercadoNuevo": false,
+    "revisionGerenteProxima": false,
+    "sensacion": "bien",
+    "prioridad": { "valor": "activa", "nivel": "confirmado" },
+    "influencias": [
+      {
+        "personaId": "p1",
+        "nombre": "Ricardo Salas (Director General)",
+        "roles": ["E"],
+        "grado": "A",
+        "modo": "P",
+        "calificacion": 4,
+        "contactada": true,
+        "ultimoContacto": "2026-10-27",
+        "nuevaEnPuesto": false,
+        "trDeclaracion": "Soportar el crecimiento a 120 tiendas sin duplicar costo logístico",
+        "prioridad": "urgente"
+      },
+      {
+        "personaId": "p2",
+        "nombre": "Marta Ibarra (Gerente de Logística)",
+        "roles": ["C", "U"],
+        "grado": "M",
+        "modo": "C",
+        "calificacion": 5,
+        "contactada": true,
+        "ultimoContacto": "2026-10-30",
+        "nuevaEnPuesto": false,
+        "trDeclaracion": "Ser reconocida por modernizar la cadena de suministro",
+        "prioridad": "activa"
+      },
+      {
+        "personaId": "p3",
+        "nombre": "Pablo Cruz (Director de TI)",
+        "roles": ["T"],
+        "grado": "M",
+        "modo": "P",
+        "calificacion": 3,
+        "contactada": true,
+        "ultimoContacto": "2026-10-22",
+        "nuevaEnPuesto": false,
+        "trDeclaracion": "Una sola plataforma integrada con su ERP",
+        "prioridad": "importante"
+      }
+    ],
+    "preguntaCompetenciaHecha": true,
+    "alternativas": [
+      { "tipo": "proveedor", "nombre": "Competidor B", "posicion": "dominante" }
+    ],
+    "contribucionDiferenciadora": { "valor": "Ya operamos su CEDIS actual y conocemos su proceso", "nivel": "confirmado" },
+    "criteriosCompraDefinidos": true,
+    "esRFP": false,
+    "contactoPrevioRFP": null,
+    "reorganizacion": { "valor": false, "nivel": "confirmado" },
+    "bant": {
+      "budget": { "valor": "Presupuesto de 500 mil USD aprobado en el plan 2027", "nivel": "confirmado" },
+      "authority": { "valor": "Ricardo Salas firma", "nivel": "confirmado" },
+      "need": { "valor": "El CEDIS actual no soporta el crecimiento", "nivel": "confirmado" },
+      "time": { "valor": "Arranque en el segundo trimestre de 2027", "nivel": "confirmado" }
+    },
+    "compellingEvent": {
+      "descripcion": "Apertura de 30 tiendas nuevas en el segundo semestre de 2027",
+      "fecha": { "valor": "2027-07-15", "nivel": "confirmado" },
+      "dueno": { "valor": "Ricardo Salas", "nivel": "confirmado" },
+      "costoInaccion": { "valor": "Perder ventas por quiebres de inventario en tiendas nuevas", "nivel": "confirmado" },
+      "urgenciaFalsa": false
+    },
+    "cadena": {
+      "ruta": "desconocida",
+      "requiereSOW": null,
+      "pasos": {
+        "aElegido": false,
+        "bContratoEnviado": false,
+        "cComentariosRecibidos": false,
+        "dEnFirma": false,
+        "eFirmado": false,
+        "fAltaProveedor": false,
+        "hOC": false
+      }
+    },
+    "criteriosArgano": [
+      { "clave": "fuente_creible", "nivel": "confirmado" },
+      { "clave": "cliente_confirma_real", "nivel": "confirmado" },
+      { "clave": "alineada_estrategia_argano", "nivel": "confirmado" },
+      { "clave": "entiende_cliente_dolores", "nivel": "confirmado" },
+      { "clave": "volumen_presupuesto_aprox", "nivel": "confirmado" },
+      { "clave": "aprobacion_calificacion_presupuesto_cliente", "nivel": "confirmado" },
+      { "clave": "business_case_identificado", "nivel": "confirmado" },
+      { "clave": "confirma_recibir_propuesta", "nivel": "confirmado" }
+    ],
+    "higieneCRM": {
+      "valores": true,
+      "actividades": true,
+      "etapas": true
+    },
+    "accionesPrevias": []
+  },
+  "esperado": {
+    "semaforo": "verde",
+    "banderasExcluye": ["sin_economico", "budget_ausente"]
+  }
+}
