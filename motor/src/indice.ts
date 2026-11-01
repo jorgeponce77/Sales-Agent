@@ -30,18 +30,18 @@ function puntosInfluencias(ctx: Contexto, banderas: Bandera[]): number {
 
 function puntosBant(ctx: Contexto): number {
   const { budget, authority, need, time } = ctx.exp.bant;
-  return [budget, authority, need, time].reduce((suma, e) => suma + PUNTOS_BANT[e.nivel], 0);
+  return [budget, authority, need, time].reduce((suma, e) => suma + (PUNTOS_BANT[e.nivel] ?? 0), 0);
 }
 
 function puntosCompellingEvent(ctx: Contexto): number {
   const { fecha, dueno, costoInaccion, urgenciaFalsa } = ctx.exp.compellingEvent;
   if (urgenciaFalsa) return 0;
-  const parte = (e: Evidencia<string>, puntos: number): number => puntos * FACTOR_CE[e.nivel];
+  const parte = (e: Evidencia<string>, puntos: number): number => puntos * (FACTOR_CE[e.nivel] ?? 0);
   return parte(fecha, 7) + parte(dueno, 7) + parte(costoInaccion, 6);
 }
 
 function puntosTriunfoResultados(ctx: Contexto): number {
-  const peso = (grado: Grado | null): number => (grado === null ? 1 : PESO_GRADO[grado]);
+  const peso = (grado: Grado | null): number => (grado === null ? 1 : (PESO_GRADO[grado] ?? 0));
   const { influencias } = ctx.exp;
   const total = influencias.reduce((suma, i) => suma + peso(i.grado), 0);
   if (total === 0) return 0;
@@ -53,13 +53,13 @@ function puntosCompetencia(ctx: Contexto): number {
   const posicion = posicionGeneral(ctx.exp);
   return (
     (ctx.exp.preguntaCompetenciaHecha ? 3 : 0) +
-    (posicion === null ? 0 : PUNTOS_POSICION[posicion]) +
-    PUNTOS_CONTRIBUCION[ctx.exp.contribucionDiferenciadora.nivel]
+    (posicion === null ? 0 : (PUNTOS_POSICION[posicion] ?? 0)) +
+    (PUNTOS_CONTRIBUCION[ctx.exp.contribucionDiferenciadora.nivel] ?? 0)
   );
 }
 
 function puntosClienteIdeal(ctx: Contexto): number {
-  const valores = ctx.exp.cuenta.clienteIdeal.map((e) => e.valor).filter((v): v is number => v !== null);
+  const valores = ctx.exp.cuenta.clienteIdeal.map((e) => e.valor).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
   if (valores.length === 0) return 0;
   return valores.reduce((a, b) => a + b, 0) / valores.length + 5;
 }

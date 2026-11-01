@@ -10,11 +10,14 @@ export function clasificarTipo(exp: Expediente): TipoOportunidad {
 
 /** Probabilidad de Argano (0..100) según tipo y etapa. */
 export function probabilidad(etapa: Etapa, tipo: TipoOportunidad, config: Config): number {
-  return config.probabilidades[tipo][etapa];
+  return config.probabilidades[tipo]?.[etapa] ?? 0;
 }
 
-/** Ciclo normal en meses: el más largo entre las líneas; sin líneas, el de WMS. */
+/**
+ * Ciclo normal en meses: el más largo entre las líneas; sin líneas (o con líneas
+ * desconocidas, que se ignoran), el de WMS.
+ */
 export function cicloMeses(exp: Expediente, config: Config): number {
-  if (exp.lineas.length === 0) return config.ciclosMeses.WMS;
-  return Math.max(...exp.lineas.map((l) => config.ciclosMeses[l]));
+  const ciclos = exp.lineas.map((l) => config.ciclosMeses[l]).filter((c): c is number => typeof c === 'number');
+  return ciclos.length === 0 ? config.ciclosMeses.WMS : Math.max(...ciclos);
 }

@@ -99,7 +99,7 @@ Algunas banderas solo se evalúan en una lente: **G** = solo gerente, **D** = so
 
 ## Si algo falla
 
-- **"el expediente no es válido"**: hay una fecha mal escrita (por ejemplo `2026-13-01`) o un número fuera de rango (calificación de una Influencia, criterios de cliente ideal). El mensaje dice el campo. Ojo: solo se revisan fechas y rangos numéricos; los valores de lista (`nivel`, `modo`, `roles`, `grado`, `ruta`, `posicion`...) cópialos exactamente de los ejemplos, porque una errata ahí no se avisa.
+- **"el expediente no es válido"**: hay una fecha mal escrita (por ejemplo `2026-13-01`), un número fuera de rango (calificación de una Influencia, criterios de cliente ideal, etapa del CRM), un valor de lista que no existe (`nivel`, `modo`, `roles`, `grado`, `prioridad`, `sensacion`, `tipo`, `posicion`, `ruta`, `lineas`...) o falta un bloque del expediente. El mensaje dice el campo y, para los valores de lista, cuáles son los válidos. Los valores de lista ahora también se revisan, así que una errata ahí sí se avisa.
 - **"el archivo no es JSON válido"**: hay una coma de más o de menos, o comillas "curvas" en lugar de comillas rectas. El mensaje dice el archivo; los demás casos siguen corriendo.
 - **"el caso está mal armado"**: falta `nombre`, `hoy`, `expediente` o `esperado`, o `esperado` tiene un campo mal escrito, está vacío o usa un id de bandera que no existe (revisa la tabla de arriba).
 - **"la bandera ... debería estar activa / no debería estar activa"**: el motor y tú difieren en esa bandera. Ahí hay algo que revisar: o el caso, o la regla.

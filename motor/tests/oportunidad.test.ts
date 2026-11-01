@@ -57,3 +57,15 @@ describe('cicloMeses', () => {
     expect(cicloMeses(expedienteBase({ lineas: [] }), CONFIG_DEFAULT)).toBe(8);
   });
 });
+
+describe('valores desconocidos nunca producen NaN (I1)', () => {
+  it('probabilidad devuelve 0 para una etapa o un tipo desconocido', () => {
+    expect(probabilidad(9 as never, 'NN', CONFIG_DEFAULT)).toBe(0);
+    expect(probabilidad(2, 'XX' as never, CONFIG_DEFAULT)).toBe(0);
+  });
+
+  it('cicloMeses ignora las líneas desconocidas y nunca da NaN', () => {
+    expect(cicloMeses(expedienteBase({ lineas: ['WMS', 'ERP' as never] }), CONFIG_DEFAULT)).toBe(8);
+    expect(cicloMeses(expedienteBase({ lineas: ['ERP' as never] }), CONFIG_DEFAULT)).toBe(8);
+  });
+});

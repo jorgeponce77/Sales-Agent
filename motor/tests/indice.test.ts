@@ -373,3 +373,23 @@ describe('índice: pesos configurables', () => {
     expect(Number.isInteger(r.componentes.triunfoResultados)).toBe(false);
   });
 });
+
+describe('índice con valores de lista desconocidos (I1)', () => {
+  it('una errata en nivel, grado, posición o ruta no produce NaN', () => {
+    const exp = expedienteSano({
+      bant: { budget: { valor: 'b', nivel: 'confirmdo' as never } },
+      compellingEvent: { fecha: { valor: '2026-12-15', nivel: 'x' as never } },
+      contribucionDiferenciadora: { valor: 'd', nivel: 'x' as never },
+      influencias: [influenciaBase({ grado: 'Z' as never }), influenciaBase({ personaId: 'b', grado: 'a' as never, roles: ['C'] })],
+      alternativas: [{ tipo: 'proveedor', nombre: 'X', posicion: 'fuerte' as never }],
+    });
+    const r = calcular(exp);
+    expect(Number.isFinite(r.total)).toBe(true);
+    for (const v of Object.values(r.componentes)) expect(Number.isFinite(v)).toBe(true);
+  });
+
+  it('un valor de cliente ideal que no es número no produce NaN', () => {
+    const exp = expedienteSano({ cuenta: { clienteIdeal: [{ valor: 'tres' as never, nivel: 'confirmado' }] } });
+    expect(Number.isFinite(calcular(exp).total)).toBe(true);
+  });
+});
