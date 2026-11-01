@@ -1,6 +1,6 @@
 # Casos de referencia de George
 
-Aquí guardas oportunidades reales (o inventadas) junto con **el diagnóstico que tú darías en un pipeline review**. Cada vez que se corren las pruebas, el motor calcula su propio diagnóstico y lo compara con el tuyo. Si no coinciden, la prueba falla y te dice cuál caso y qué campo.
+Aquí guardas oportunidades reales (o inventadas) junto con **el diagnóstico que tú darías en un pipeline review**. Cada vez que se corren las pruebas, el motor calcula su propio diagnóstico y lo compara con el tuyo. Si no coinciden, la prueba falla ("pasa" y "falla" se refieren a la prueba, no al color del semáforo) y te dice cuál caso y qué campo.
 
 Un caso = un archivo `.json` dentro de la carpeta `casos/`.
 
@@ -18,7 +18,7 @@ Un caso = un archivo `.json` dentro de la carpeta `casos/`.
    npx vitest run tests/golden
    ```
 
-   Verde = el motor coincide contigo. Rojo = el mensaje dice `archivo: campo` con lo esperado y lo obtenido.
+   Prueba pasada = el motor coincide contigo. Prueba fallida = el mensaje dice `archivo: campo` con lo esperado y lo obtenido. (Esto no tiene que ver con el semáforo verde/ámbar/rojo de la oportunidad.)
 
 ## Qué va en `esperado`
 
@@ -99,7 +99,8 @@ Algunas banderas solo se evalúan en una lente: **G** = solo gerente, **D** = so
 
 ## Si algo falla
 
-- **"el expediente no es válido"**: hay un dato fuera de rango o una fecha mal escrita (por ejemplo `2026-13-01`). El mensaje dice el campo exacto.
+- **"el expediente no es válido"**: hay una fecha mal escrita (por ejemplo `2026-13-01`) o un número fuera de rango (calificación de una Influencia, criterios de cliente ideal). El mensaje dice el campo. Ojo: solo se revisan fechas y rangos numéricos; los valores de lista (`nivel`, `modo`, `roles`, `grado`, `ruta`, `posicion`...) cópialos exactamente de los ejemplos, porque una errata ahí no se avisa.
+- **"el archivo no es JSON válido"**: hay una coma de más o de menos, o comillas "curvas" en lugar de comillas rectas. El mensaje dice el archivo; los demás casos siguen corriendo.
+- **"el caso está mal armado"**: falta `nombre`, `hoy`, `expediente` o `esperado`, o `esperado` tiene un campo mal escrito, está vacío o usa un id de bandera que no existe (revisa la tabla de arriba).
 - **"la bandera ... debería estar activa / no debería estar activa"**: el motor y tú difieren en esa bandera. Ahí hay algo que revisar: o el caso, o la regla.
-- **Error de JSON** (comas, comillas): revisa que cada línea termine en coma salvo la última de cada bloque, y que los textos vayan entre comillas dobles.
 - Los dos ejemplos son plantillas; no los borres, te sirven de guía de qué campos lleva un expediente.
