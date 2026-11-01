@@ -1,4 +1,4 @@
-import type { Evidencia, Expediente } from '../src/tipos.js';
+import type { Evidencia, Expediente, Influencia } from '../src/tipos.js';
 
 /** Parcial profundo: los objetos se fusionan campo a campo; los arreglos se reemplazan completos. */
 export type DeepPartial<T> =
@@ -76,4 +76,13 @@ export function expedienteBase(over: DeepPartial<Expediente> = {}): Expediente {
     accionesPrevias: [],
   };
   return fusionar(base, over) as Expediente;
+}
+
+/** Influencia mínima y válida (rol E, grado A, modo P, calificación 3, contactada). Solo para pruebas. */
+export function influenciaBase(over: Partial<Influencia> = {}): Influencia {
+  return {
+    personaId: 'p1', nombre: 'Persona', roles: ['E'], grado: 'A', modo: 'P', calificacion: 3,
+    contactada: true, nuevaEnPuesto: false, trDeclaracion: 'Reducir costo logístico', prioridad: 'activa',
+    ...over,
+  };
 }

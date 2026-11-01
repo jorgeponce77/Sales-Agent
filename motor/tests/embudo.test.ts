@@ -2,18 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CONFIG_DEFAULT } from '../src/config.js';
 import { construirContexto } from '../src/contexto.js';
 import { estaAtorada, nivelEmbudo } from '../src/embudo.js';
-import type { Influencia } from '../src/tipos.js';
-import { expedienteBase } from './fabrica.js';
+import { expedienteBase, influenciaBase } from './fabrica.js';
 
 const HOY = '2026-11-02';
-
-function influencia(over: Partial<Influencia> = {}): Influencia {
-  return {
-    personaId: 'p1', nombre: 'Persona', roles: ['E'], grado: 'A', modo: 'P', calificacion: 3,
-    contactada: true, nuevaEnPuesto: false, trDeclaracion: 'Reducir costo logístico', prioridad: 'activa',
-    ...over,
-  };
-}
 
 describe('estaAtorada', () => {
   it('atorada_si_supera_el_ciclo', () => {
@@ -40,14 +31,14 @@ describe('nivelEmbudo', () => {
   it('influencia_contactada_en_P_es_en_embudo', () => {
     const exp = expedienteBase({
       bant: { need: { valor: 'Reducir mermas', nivel: 'supuesto' } },
-      influencias: [influencia({ roles: ['U'], modo: 'P', grado: 'B', trDeclaracion: null })],
+      influencias: [influenciaBase({ roles: ['U'], modo: 'P', grado: 'B', trDeclaracion: null })],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
 
   it('influencia_contactada_en_modo_E_no_basta_para_en_embudo', () => {
     const exp = expedienteBase({
-      influencias: [influencia({ roles: ['U'], modo: 'E', grado: 'B', trDeclaracion: null })],
+      influencias: [influenciaBase({ roles: ['U'], modo: 'E', grado: 'B', trDeclaracion: null })],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('universo');
   });
@@ -57,7 +48,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia()],
+      influencias: [influenciaBase()],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('pocos_selectos');
   });
@@ -66,7 +57,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-06-01',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia()],
+      influencias: [influenciaBase()],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -75,7 +66,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-03',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia()],
+      influencias: [influenciaBase()],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -91,7 +82,7 @@ describe('nivelEmbudo', () => {
   it('sin_fecha_de_cierre_no_es_pocos_selectos', () => {
     const exp = expedienteBase({
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia()],
+      influencias: [influenciaBase()],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -100,7 +91,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia({ roles: ['U'] })],
+      influencias: [influenciaBase({ roles: ['U'] })],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -109,7 +100,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia(), influencia({ personaId: 'p2', roles: ['U'], contactada: false })],
+      influencias: [influenciaBase(), influenciaBase({ personaId: 'p2', roles: ['U'], contactada: false })],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -118,7 +109,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia({ trDeclaracion: null })],
+      influencias: [influenciaBase({ trDeclaracion: null })],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -127,7 +118,7 @@ describe('nivelEmbudo', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
       cadena: { pasos: { aElegido: true } },
-      influencias: [influencia(), influencia({ personaId: 'p2', roles: ['U'], grado: 'B', trDeclaracion: null })],
+      influencias: [influenciaBase(), influenciaBase({ personaId: 'p2', roles: ['U'], grado: 'B', trDeclaracion: null })],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('pocos_selectos');
   });
@@ -135,7 +126,7 @@ describe('nivelEmbudo', () => {
   it('proveedor_no_elegido_impide_pocos_selectos', () => {
     const exp = expedienteBase({
       fechaCierreCRM: '2027-03-02',
-      influencias: [influencia()],
+      influencias: [influenciaBase()],
     });
     expect(nivelEmbudo(exp, HOY, CONFIG_DEFAULT)).toBe('en_embudo');
   });
@@ -171,10 +162,10 @@ describe('construirContexto', () => {
   });
 
   it('contexto_deriva_economicos_coaches_y_demas_campos', () => {
-    const e = influencia({ personaId: 'e1', roles: ['E'] });
-    const c = influencia({ personaId: 'c1', roles: ['C'] });
-    const ec = influencia({ personaId: 'ec1', roles: ['E', 'C'] });
-    const u = influencia({ personaId: 'u1', roles: ['U'] });
+    const e = influenciaBase({ personaId: 'e1', roles: ['E'] });
+    const c = influenciaBase({ personaId: 'c1', roles: ['C'] });
+    const ec = influenciaBase({ personaId: 'ec1', roles: ['E', 'C'] });
+    const u = influenciaBase({ personaId: 'u1', roles: ['U'] });
     const exp = expedienteBase({
       fechaCreacion: '2026-01-01',
       cuenta: { esClienteNetlogistik: true },
