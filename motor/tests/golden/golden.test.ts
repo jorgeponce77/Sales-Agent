@@ -1,10 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { calcularDiagnostico, validarExpediente } from '../../src/index.js';
+import { CATALOGO_REGLAS, calcularDiagnostico, validarExpediente } from '../../src/index.js';
 import type { Etapa, Expediente, VeredictoFecha } from '../../src/index.js';
 import { fechaValida } from '../../src/validar.js';
-import { CATALOGO_BANDERAS } from '../../src/reglas/index.js';
 
 /** Formato de cada archivo de `casos/`. Solo se comparan los campos presentes en `esperado`. */
 interface CasoReferencia {
@@ -23,7 +22,7 @@ interface CasoReferencia {
 const CLAVES_ESPERADO = ['etapaRecomendada', 'veredictoFecha', 'semaforo', 'banderasIncluye', 'banderasExcluye'];
 const VEREDICTOS = ['creible', 'en_riesgo', 'no_cierra_fecha', 'no_cierra_periodo'];
 const SEMAFOROS = ['verde', 'ambar', 'rojo'];
-const IDS_BANDERA = new Set(CATALOGO_BANDERAS.map((r) => r.id));
+const IDS_BANDERA = new Set(CATALOGO_REGLAS.map((r) => r.id));
 
 const carpeta = fileURLToPath(new URL('./casos/', import.meta.url));
 
