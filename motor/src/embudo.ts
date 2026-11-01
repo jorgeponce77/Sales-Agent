@@ -1,9 +1,14 @@
 import { diasNaturalesEntre, sumarDiasNaturales } from './fechas.js';
 import { cicloMeses } from './oportunidad.js';
+import { fechaValida } from './validar.js';
 import type { Config, Expediente, NivelEmbudo } from './tipos.js';
 
-/** Atorada: lleva más días naturales desde su creación que el ciclo normal de la(s) línea(s). */
+/**
+ * Atorada: lleva más días naturales desde su creación que el ciclo normal de la(s) línea(s).
+ * Sin una fecha de creación válida no se puede afirmar: false.
+ */
 export function estaAtorada(exp: Expediente, hoy: string, config: Config): boolean {
+  if (!fechaValida(exp.fechaCreacion) || !fechaValida(hoy)) return false;
   return diasNaturalesEntre(exp.fechaCreacion, hoy) > cicloMeses(exp, config) * 30;
 }
 

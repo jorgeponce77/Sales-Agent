@@ -3,6 +3,8 @@
  * Se parsea a mano con Date.UTC: nunca `new Date('YYYY-MM-DD')` ni métodos de hora local.
  */
 
+import { fechaValida } from './validar.js';
+
 const MS_DIA = 86_400_000;
 
 function aUtc(fecha: string): number {
@@ -34,8 +36,12 @@ export function diasNaturalesEntre(a: string, b: string): number {
   return Math.round((aUtc(b) - aUtc(a)) / MS_DIA);
 }
 
-/** Cuenta desde el día siguiente a `desde`; con `dias <= 0` devuelve `desde` sin cambios. */
+/**
+ * Cuenta desde el día siguiente a `desde`; con `dias <= 0` devuelve `desde` sin cambios.
+ * Si `desde` no es una fecha válida o `dias` no es un número finito >= 0, devuelve `desde` sin cambios.
+ */
 export function sumarDiasHabiles(desde: string, dias: number, festivos: string[]): string {
+  if (!fechaValida(desde) || !Number.isFinite(dias) || dias < 0) return desde;
   let actual = desde;
   let restantes = dias;
   while (restantes > 0) {
@@ -45,13 +51,15 @@ export function sumarDiasHabiles(desde: string, dias: number, festivos: string[]
   return actual;
 }
 
-/** Días hábiles en el intervalo (a, b]; 0 si b <= a. */
+/** Días hábiles en el intervalo (a, b]; 0 si b <= a o si alguna de las fechas es inválida. */
 export function diasHabilesEntre(a: string, b: string, festivos: string[]): number {
+  if (!fechaValida(a) || !fechaValida(b)) return 0;
+  const fin = aUtc(b);
   let cuenta = 0;
-  let actual = a;
-  while (actual < b) {
-    actual = sumarDiasNaturales(actual, 1);
-    if (esHabil(actual, festivos)) cuenta++;
+  let actual = aUtc(a);
+  while (actual < fin) {
+    actual += MS_DIA;
+    if (esHabil(aIso(actual), festivos)) cuenta++;
   }
   return cuenta;
 }

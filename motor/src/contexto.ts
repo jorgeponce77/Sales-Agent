@@ -3,6 +3,7 @@ import { compararEtapa, etapaRecomendada } from './etapa.js';
 import { esFechaOptimista, evaluarFechaCierre } from './fechaCierre.js';
 import { lenteActiva } from './lente.js';
 import { clasificarTipo } from './oportunidad.js';
+import { fechaValida } from './validar.js';
 import type {
   Config, Etapa, Expediente, Influencia, Lente, NivelEmbudo, ResultadoFecha, TipoOportunidad,
 } from './tipos.js';
@@ -26,7 +27,24 @@ export interface Contexto {
   coaches: Influencia[];
 }
 
-export function construirContexto(exp: Expediente, hoy: string, config: Config): Contexto {
+/**
+ * Las fechas del expediente que no son fechas reales se tratan como ausentes (null).
+ * Devuelve el mismo expediente si no hay nada que corregir; si no, una copia superficial.
+ */
+function sanearFechas(exp: Expediente): Expediente {
+  const cierreMala = exp.fechaCierreCRM !== null && !fechaValida(exp.fechaCierreCRM);
+  const creacionMala = !fechaValida(exp.fechaCreacion);
+  if (!cierreMala && !creacionMala) return exp;
+  return {
+    ...exp,
+    fechaCierreCRM: cierreMala ? null : exp.fechaCierreCRM,
+    // El tipo exige string, pero una fecha de creación inutilizable se trata como ausente (null).
+    fechaCreacion: creacionMala ? (null as unknown as string) : exp.fechaCreacion,
+  };
+}
+
+export function construirContexto(original: Expediente, hoy: string, config: Config): Contexto {
+  const exp = sanearFechas(original);
   const lente = lenteActiva(exp, hoy);
   const etapaRec = etapaRecomendada(exp, config);
   return {

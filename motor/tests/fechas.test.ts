@@ -93,3 +93,20 @@ describe('finDeTrimestre', () => {
     expect(finDeTrimestre('2026-08-15')).toBe('2026-09-30');
   });
 });
+
+describe('fechas inválidas (C1)', () => {
+  it('diasHabilesEntre devuelve 0 si alguna fecha es inválida, sin colgarse', () => {
+    expect(diasHabilesEntre('2026-11-02', 'TBD', MX)).toBe(0);
+    expect(diasHabilesEntre('TBD', '2026-11-09', MX)).toBe(0);
+    expect(diasHabilesEntre('2026-11-02', '31/12/2026', MX)).toBe(0);
+    expect(diasHabilesEntre('2026-11-02', '2026-02-30', MX)).toBe(0);
+  });
+  it('sumarDiasHabiles devuelve desde sin cambios si desde es inválida', () => {
+    expect(sumarDiasHabiles('TBD', 5, MX)).toBe('TBD');
+  });
+  it('sumarDiasHabiles devuelve desde sin cambios si dias no es un número finito >= 0', () => {
+    expect(sumarDiasHabiles('2026-11-02', Number.NaN, MX)).toBe('2026-11-02');
+    expect(sumarDiasHabiles('2026-11-02', Number.POSITIVE_INFINITY, MX)).toBe('2026-11-02');
+    expect(sumarDiasHabiles('2026-11-02', -3, MX)).toBe('2026-11-02');
+  });
+});

@@ -3,7 +3,7 @@ import type { Evidencia, Expediente, ErrorValidacion } from './tipos.js';
 const PATRON_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Verdadero si `s` es una fecha ISO `YYYY-MM-DD` que existe en el calendario. */
-function fechaValida(s: unknown): boolean {
+export function fechaValida(s: unknown): boolean {
   if (typeof s !== 'string' || !PATRON_FECHA.test(s)) return false;
   const [a, m, d] = s.split('-').map(Number) as [number, number, number];
   const f = new Date(Date.UTC(a, m - 1, d));

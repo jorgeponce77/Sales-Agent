@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { calcularDiagnostico, validarExpediente } from '../../src/index.js';
 import type { Etapa, Expediente, VeredictoFecha } from '../../src/index.js';
+import { fechaValida } from '../../src/validar.js';
 import { CATALOGO_BANDERAS } from '../../src/reglas/index.js';
 
 /** Formato de cada archivo de `casos/`. Solo se comparan los campos presentes en `esperado`. */
@@ -34,13 +35,6 @@ function listarArchivos(): string[] {
   }
 }
 
-function esFechaReal(s: unknown): boolean {
-  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const [a, m, d] = s.split('-').map(Number) as [number, number, number];
-  const f = new Date(Date.UTC(a, m - 1, d));
-  return f.getUTCFullYear() === a && f.getUTCMonth() === m - 1 && f.getUTCDate() === d;
-}
-
 const esObjeto = (x: unknown): x is Record<string, unknown> =>
   typeof x === 'object' && x !== null && !Array.isArray(x);
 
@@ -49,7 +43,7 @@ function problemasDeForma(caso: unknown): string[] {
   if (!esObjeto(caso)) return ['el archivo debe contener un objeto JSON con nombre, hoy, expediente y esperado'];
   const p: string[] = [];
   if (typeof caso.nombre !== 'string' || caso.nombre.trim() === '') p.push('"nombre" debe ser un texto no vacío');
-  if (!esFechaReal(caso.hoy)) p.push(`"hoy" debe ser una fecha real AAAA-MM-DD (recibido ${JSON.stringify(caso.hoy)})`);
+  if (!fechaValida(caso.hoy)) p.push(`"hoy" debe ser una fecha real AAAA-MM-DD (recibido ${JSON.stringify(caso.hoy)})`);
   if (!esObjeto(caso.expediente)) p.push('falta "expediente" (debe ser un objeto)');
 
   const e = caso.esperado;

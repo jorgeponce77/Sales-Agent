@@ -80,4 +80,28 @@ describe('calcularDiagnostico', () => {
     const d = calcularDiagnostico(expedienteBase({ etapaCRM: 2 }), HOY, config);
     expect(d.probabilidadDeclarada).toBe(3);
   });
+
+  describe('fechas de cierre inválidas (C1)', () => {
+    const director = (fechaCierreCRM: string) => expedienteBase({
+      etapaCRM: 3,
+      fechaCierreCRM,
+      cadena: { ruta: 'contrato', pasos: { aElegido: true } },
+    });
+
+    it.each(['TBD', '31/12/2026', '2026-02-30', ''])('fechaCierreCRM %j no cuelga ni da creíble: no_cierra_fecha', (malo) => {
+      const exp = director(malo);
+      const antes = Date.now();
+      const d = calcularDiagnostico(exp, HOY);
+      expect(Date.now() - antes).toBeLessThan(1000);
+      expect(d.fecha?.veredicto).toBe('no_cierra_fecha');
+      expect(exp.fechaCierreCRM).toBe(malo); // no se muta el expediente del llamador
+    });
+
+    it('fechaCreacion inválida: no está atorada y no lanza', () => {
+      const exp = expedienteBase({ fechaCreacion: 'ayer' });
+      const d = calcularDiagnostico(exp, HOY);
+      expect(d.atorada).toBe(false);
+      expect(exp.fechaCreacion).toBe('ayer');
+    });
+  });
 });
