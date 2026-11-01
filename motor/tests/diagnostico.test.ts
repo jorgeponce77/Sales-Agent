@@ -36,6 +36,12 @@ describe('calcularDiagnostico', () => {
     });
     const d = calcularDiagnostico(exp, HOY);
     expect(d.cerrada).toBe(true);
+    // Una oportunidad cerrada no lleva señales de pronóstico (ruling F1).
+    expect(d.etapaRecomendada).toBe(5);
+    expect(d.comparacionEtapa).toBe('al_dia');
+    expect(d.probabilidadDeclarada).toBe(100);
+    expect(d.probabilidadAjustada).toBe(100);
+    expect(d.fecha).toBeNull();
     expect(d.banderas).toEqual([]);
     expect(d.huecos).toEqual([]);
     expect(d.analisisCompleto).toEqual([]);
@@ -64,8 +70,10 @@ describe('calcularDiagnostico', () => {
     expect(d.probabilidadDeclarada).toBe(65);
     expect(d.lente).toBe('director');
     expect(d.fecha?.diasPendientes).toBe(15);
-    expect(d.probabilidadAjustada).toBe(CONFIG_DEFAULT.probabilidades.ENxT[d.etapaRecomendada]);
-    expect(d.comparacionEtapa).toBe(d.etapaCRM > d.etapaRecomendada ? 'inflada' : d.etapaCRM < d.etapaRecomendada ? 'rezagada' : 'al_dia');
+    // Sin criterios de Argano confirmados la etapa recomendada es 0: ENxT[0] = 0 y el CRM está inflado.
+    expect(d.etapaRecomendada).toBe(0);
+    expect(d.probabilidadAjustada).toBe(0);
+    expect(d.comparacionEtapa).toBe('inflada');
   });
 
   it('con lente gerente fecha es null y fechaOptimista viene del contexto', () => {

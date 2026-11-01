@@ -70,6 +70,53 @@ describe('validarAcciones', () => {
     expect(validarAcciones([b], banderas, fortalezas, HOY, CONFIG_DEFAULT).rechazadas[0]?.motivo).toBe('sin_responsable');
   });
 
+  it('rechaza que vacío o en blanco como sin_que', () => {
+    const a = accion({ que: '' });
+    const b = accion({ que: '   ' });
+    const c = accion({ que: undefined as never });
+    const r = validarAcciones([a, b, c], banderas, fortalezas, HOY, CONFIG_DEFAULT);
+    expect(r.aceptadas).toEqual([]);
+    expect(r.rechazadas.map((x) => x.motivo)).toEqual(['sin_que', 'sin_que', 'sin_que']);
+  });
+
+  it('quien nulo o ausente se rechaza como sin_responsable, sin lanzar', () => {
+    const a = accion({ quien: null as never });
+    const b = accion({ quien: undefined as never });
+    let r: ReturnType<typeof validarAcciones> | undefined;
+    expect(() => { r = validarAcciones([a, b], banderas, fortalezas, HOY, CONFIG_DEFAULT); }).not.toThrow();
+    expect(r?.rechazadas.map((x) => x.motivo)).toEqual(['sin_responsable', 'sin_responsable']);
+  });
+
+  it('cuando ausente, con hora o mal formado se rechaza como cuando_invalido', () => {
+    const casos = [
+      accion({ cuando: undefined as never }),
+      accion({ cuando: '2026-11-10T09:00' }),
+      accion({ cuando: '10/11/2026' }),
+      accion({ cuando: '2026-11-31' }),
+      accion({ cuando: '' }),
+    ];
+    const r = validarAcciones(casos, banderas, fortalezas, HOY, CONFIG_DEFAULT);
+    expect(r.aceptadas).toEqual([]);
+    expect(r.rechazadas.map((x) => x.motivo)).toEqual(Array(5).fill('cuando_invalido'));
+  });
+
+  it('una acción nula no lanza y se rechaza', () => {
+    let r: ReturnType<typeof validarAcciones> | undefined;
+    expect(() => { r = validarAcciones([null as never], banderas, fortalezas, HOY, CONFIG_DEFAULT); }).not.toThrow();
+    expect(r?.rechazadas.map((x) => x.motivo)).toEqual(['no_atiende_bandera_ni_fortaleza']);
+  });
+
+  it('orden completo de motivos: atiende, que, quien, cuando, horizonte', () => {
+    const todo = { atiende: 'inventado', que: '', quien: '', cuando: 'x' };
+    const motivo = (a: AccionPropuesta) => validarAcciones([a], banderas, fortalezas, HOY, CONFIG_DEFAULT).rechazadas[0]?.motivo;
+    expect(motivo(accion(todo))).toBe('no_atiende_bandera_ni_fortaleza');
+    expect(motivo(accion({ ...todo, atiende: 'sin_economico' }))).toBe('sin_que');
+    expect(motivo(accion({ ...todo, atiende: 'sin_economico', que: 'Algo' }))).toBe('sin_responsable');
+    expect(motivo(accion({ ...todo, atiende: 'sin_economico', que: 'Algo', quien: 'George' }))).toBe('cuando_invalido');
+    expect(motivo(accion({ ...todo, atiende: 'sin_economico', que: 'Algo', quien: 'George', cuando: '2020-01-01' })))
+      .toBe('fuera_de_horizonte');
+  });
+
   it('ordena por severidad: críticas, altas, medias y al final fortalezas', () => {
     const f = accion({ que: 'f', atiende: 'coach_fuerte' });
     const m = accion({ que: 'm', atiende: 'tr_no_redactado' });
