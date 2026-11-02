@@ -6,3 +6,5 @@ dist/
 agente/evals/informes/
 .next/
 agente/dist-evals/
+web-pruebas/next-env.d.ts
+*.tsbuildinfo
