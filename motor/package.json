@@ -2,10 +2,20 @@
   "name": "motor-sales-agent",
   "version": "0.1.0",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "private": true,
   "devDependencies": {
     "@types/node": "^22.20.5",
