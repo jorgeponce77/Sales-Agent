@@ -8,3 +8,4 @@ agente/evals/informes/
 agente/dist-evals/
 web-pruebas/next-env.d.ts
 *.tsbuildinfo
+web-pruebas/e2e/*.png
