@@ -2,10 +2,9 @@ import { CONFIG_DEFAULT } from 'motor-sales-agent';
 import type { Alternativa, Expediente, Influencia } from 'motor-sales-agent';
 import { convertirAUSD, validarFicha } from '../ficha.js';
 import type { Ficha } from '../tipos.js';
-import { aplicarEscritura, rechazar } from './escritura.js';
-import type { EstadoTurno, ResultadoHerramienta } from './escritura.js';
+import { aplicarEscritura, rechazar, segura } from './escritura.js';
+import type { EstadoTurno, Herramienta, ResultadoHerramienta } from './escritura.js';
 
-type Herramienta = (estado: EstadoTurno, input: unknown) => ResultadoHerramienta;
 type Obj = Record<string, unknown>;
 
 const esObjeto = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -15,23 +14,6 @@ const presente = (o: Obj, k: string): boolean => o[k] !== undefined;
 /** Minúsculas, sin acentos y con espacios colapsados. */
 function normalizar(s: string): string {
   return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
-/** Envuelve una herramienta para que nunca lance: cualquier excepción se vuelve `{ ok: false }`. */
-function segura(nombre: string, fn: (estado: EstadoTurno, input: unknown) => ResultadoHerramienta): Herramienta {
-  return (estado, input) => {
-    try {
-      return fn(estado, input);
-    } catch (e) {
-      const mensaje = `error interno: ${e instanceof Error ? e.message : String(e)}`;
-      try {
-        estado.eventos.push({ tipo: 'error', descripcion: `Falló ${nombre}. ${mensaje}`, fecha: estado.hoy });
-      } catch {
-        // el estado mismo es inutilizable: solo devolvemos el error
-      }
-      return { ok: false, errores: [mensaje] };
-    }
-  };
 }
 
 /** Entrada que no es un objeto: rechazo con evento. */

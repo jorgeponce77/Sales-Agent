@@ -14,6 +14,8 @@ export type ResultadoHerramienta =
   | { ok: true; datos?: unknown; mensaje?: string }
   | { ok: false; errores: string[] };
 
+export type Herramienta = (estado: EstadoTurno, input: unknown) => ResultadoHerramienta;
+
 /** Registra el rechazo en los eventos del turno y devuelve el resultado de error. */
 export function rechazar(estado: EstadoTurno, descripcion: string, errores: string[]): ResultadoHerramienta {
   estado.eventos.push({
@@ -33,7 +35,7 @@ export function aplicarEscritura(
   estado: EstadoTurno,
   descripcion: string,
   mutar: (exp: Expediente) => void,
-  tipoEvento: 'dato' | 'ficha' = 'dato',
+  tipoEvento: 'dato' | 'ficha' | 'accion' = 'dato',
 ): ResultadoHerramienta {
   try {
     const copia = structuredClone(estado.oportunidad.expediente);
@@ -50,4 +52,21 @@ export function aplicarEscritura(
   } catch (e) {
     return rechazar(estado, descripcion, [`error interno: ${e instanceof Error ? e.message : String(e)}`]);
   }
+}
+
+/** Envuelve una herramienta para que nunca lance: cualquier excepción se vuelve `{ ok: false }`. */
+export function segura(nombre: string, fn: (estado: EstadoTurno, input: unknown) => ResultadoHerramienta): Herramienta {
+  return (estado, input) => {
+    try {
+      return fn(estado, input);
+    } catch (e) {
+      const mensaje = `error interno: ${e instanceof Error ? e.message : String(e)}`;
+      try {
+        estado.eventos.push({ tipo: 'error', descripcion: `Falló ${nombre}. ${mensaje}`, fecha: estado.hoy });
+      } catch {
+        // el estado mismo es inutilizable: solo devolvemos el error
+      }
+      return { ok: false, errores: [mensaje] };
+    }
+  };
 }
