@@ -49,3 +49,11 @@ export const MODOS_SESION: ReadonlyArray<{ valor: 'calificar' | 'revision_rapida
 ];
 
 export const etiquetaModo = (modo: string): string => MODOS_SESION.find((m) => m.valor === modo)?.etiqueta ?? modo;
+
+/** Monto escrito por una persona ("450,000", "450 000", "450000.50") o null si no es un número mayor que 0. Solo quita comas y espacios. */
+export function parsearTcv(texto: string): number | null {
+  const limpio = texto.replace(/[,\s]/g, '');
+  if (limpio === '' || !/^\d+(\.\d+)?$/.test(limpio)) return null;
+  const monto = Number(limpio);
+  return Number.isFinite(monto) && monto > 0 ? monto : null;
+}

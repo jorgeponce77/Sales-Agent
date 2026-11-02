@@ -41,7 +41,6 @@ export default function Chat({ bloques, pendiente, pensando, puedeEscribir, moti
   const lista = useRef<HTMLDivElement>(null);
   const campo = useRef<HTMLTextAreaElement>(null);
   const deshabilitado = !puedeEscribir || pensando;
-  const hayMensajes = bloques.some((b) => b.mensajes.length > 0) || pendiente !== null;
   const totalMensajes = bloques.reduce((n, b) => n + b.mensajes.length, 0);
 
   useEffect(() => {
@@ -77,7 +76,6 @@ export default function Chat({ bloques, pendiente, pensando, puedeEscribir, moti
   return (
     <section className="chat" aria-label="Conversación">
       <div className="chat-lista" ref={lista} tabIndex={0} role="log" aria-live="polite">
-        {!hayMensajes && !pensando && <p className="vacio">{motivo}</p>}
         {bloques.map((b) => (
           <div key={b.clave} className="chat-sesion">
             <p className="chat-encabezado">{b.encabezado}</p>
@@ -96,6 +94,7 @@ export default function Chat({ bloques, pendiente, pensando, puedeEscribir, moti
             {pensando && <li className="burbuja burbuja-agente burbuja-pensando">pensando…</li>}
           </ul>
         )}
+        {!puedeEscribir && !pensando && <p className="chat-nota">{motivo}</p>}
       </div>
       <form
         className="chat-entrada"
@@ -112,7 +111,7 @@ export default function Chat({ bloques, pendiente, pensando, puedeEscribir, moti
           maxLength={MAX_MENSAJE}
           value={borrador}
           disabled={deshabilitado}
-          placeholder={puedeEscribir ? 'Escribe tu mensaje' : motivo}
+          placeholder={puedeEscribir ? 'Escribe tu mensaje' : 'Sin sesión abierta'}
           onChange={(e) => setBorrador(e.target.value)}
           onKeyDown={alTeclear}
         />

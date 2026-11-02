@@ -62,24 +62,40 @@ const esResultadoTurno = (x: unknown): x is ResultadoTurno =>
 const totalTokens = (u: Uso): number => u.entrada + u.salida + u.cacheLectura + u.cacheEscritura;
 const miles = (n: number): string => n.toLocaleString('es-MX');
 
-/** Copia al portapapeles; el texto llega de la red, así que se entrega como promesa (Safari exige el gesto del clic). */
+/**
+ * Copia al portapapeles; el texto llega de la red, así que se entrega como promesa (Safari exige el gesto del clic).
+ * La petición se hace una sola vez: si falla, el mismo error sale por cualquiera de los dos caminos.
+ */
 async function copiarAlPortapapeles(obtener: () => Promise<string>): Promise<void> {
-  let texto: string | null = null;
-  const conTexto = async (): Promise<string> => (texto ??= await obtener());
+  let peticion: Promise<string> | null = null;
+  const conTexto = (): Promise<string> => (peticion ??= obtener());
   if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
     try {
       await navigator.clipboard.write([
         new ClipboardItem({ 'text/plain': conTexto().then((t) => new Blob([t], { type: 'text/plain' })) }),
       ]);
       return;
-    } catch (e) {
-      if (e instanceof ErrorVisible) throw e;
+    } catch {
+      // Si falló la petición, `conTexto()` vuelve a lanzar ese mismo error y no se repite la llamada.
     }
   }
   await navigator.clipboard.writeText(await conTexto());
 }
 
 interface Aviso { tipo: 'error' | 'info'; texto: string }
+
+/** ¿La pantalla es de escritorio (900 px o más)? Empieza en false para que el servidor y el cliente coincidan. */
+function useEscritorio(): boolean {
+  const [escritorio, setEscritorio] = useState(false);
+  useEffect(() => {
+    const consulta = window.matchMedia('(min-width: 900px)');
+    const actualizar = (): void => setEscritorio(consulta.matches);
+    actualizar();
+    consulta.addEventListener('change', actualizar);
+    return () => consulta.removeEventListener('change', actualizar);
+  }, []);
+  return escritorio;
+}
 
 export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista[] }) {
   const almacen = useRef<Almacen | null>(null);
@@ -93,6 +109,8 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
   const [uso, setUso] = useState<Uso>({ entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0 });
   const [panelAbierto, setPanelAbierto] = useState(true);
   const [listo, setListo] = useState(false);
+  const [confirmandoNueva, setConfirmandoNueva] = useState(false);
+  const escritorio = useEscritorio();
 
   // El almacén se crea en el cliente, dentro de un efecto: el servidor no tiene localStorage.
   useEffect(() => {
@@ -157,6 +175,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
   }
 
   async function iniciar(): Promise<void> {
+    setConfirmandoNueva(false);
     if (actual !== null) {
       await turno({ accion: 'iniciar', oportunidad: actual, modo });
     } else if (escenario !== undefined) {
@@ -180,8 +199,12 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
   async function terminar(): Promise<void> {
     if (actual === null) return;
     const res = await turno({ accion: 'cerrar', oportunidad: actual });
-    if (res !== null && res.error === null && res.oportunidad.sesionActual !== null) {
-      setAviso({ tipo: 'info', texto: 'La sesión sigue abierta: el agente no la cerró. Vuelve a pulsar "Terminar sesión".' });
+    // Si la oportunidad quedó cerrada en el CRM no hay nada más que intentar: el chat ya muestra el motivo.
+    if (res !== null && res.error === null && res.oportunidad.sesionActual !== null && !res.oportunidad.cerrada) {
+      setAviso({
+        tipo: 'info',
+        texto: 'El agente no cerró la sesión. Puedes seguir conversando o usar "Iniciar sesión nueva": la sesión abierta se guardará como interrumpida.',
+      });
     }
   }
 
@@ -230,7 +253,9 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
   ];
 
   const cerrada = actual?.cerrada === true;
+  const sesionAbierta = sesion !== null && !cerrada;
   const puedeIniciar = listo && !ocupado && !cerrada && sesion === null && (actual !== null || escenario !== undefined);
+  const mostrarConfirmacion = confirmandoNueva && sesionAbierta && !ocupado;
   const motivoChat = cerrada && actual !== null
     ? `Esta oportunidad está cerrada en el CRM (etapa ${actual.ficha.etapaCRM}); no hay nada que calificar.`
     : 'Pulsa "Iniciar sesión" para empezar la conversación.';
@@ -262,7 +287,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
       <section className="lab-controles" aria-label="Controles">
         <label className="campo">
           Oportunidad
-          <select value={seleccion} onChange={(e) => { setSeleccion(e.target.value); setAviso(null); }} disabled={ocupado}>
+          <select value={seleccion} onChange={(e) => { setSeleccion(e.target.value); setAviso(null); setConfirmandoNueva(false); }} disabled={ocupado}>
             <optgroup label="Escenarios">
               {escenarios.map((e) => (
                 <option key={e.id} value={`esc:${e.id}`}>
@@ -288,10 +313,16 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
               </select>
             </label>
             <div className="botones">
-              <button type="button" className="boton boton-principal" disabled={!puedeIniciar} onClick={() => void iniciar()}>
-                Iniciar sesión
-              </button>
-              <button type="button" className="boton" disabled={ocupado || sesion === null} onClick={() => void terminar()}>
+              {sesionAbierta ? (
+                <button type="button" className="boton" disabled={ocupado} onClick={() => setConfirmandoNueva(true)}>
+                  Iniciar sesión nueva
+                </button>
+              ) : (
+                <button type="button" className="boton boton-principal" disabled={!puedeIniciar} onClick={() => void iniciar()}>
+                  Iniciar sesión
+                </button>
+              )}
+              <button type="button" className="boton" disabled={ocupado || !sesionAbierta} onClick={() => void terminar()}>
                 Terminar sesión
               </button>
               <button type="button" className="boton" disabled={ocupado || actual === null} onClick={() => void copiar()}>
@@ -301,6 +332,15 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
                 Reiniciar
               </button>
             </div>
+            {mostrarConfirmacion && (
+              <div className="confirmacion" role="group" aria-label="Confirmar nueva sesión">
+                <p>La sesión abierta se guardará como interrumpida. ¿Iniciar una nueva?</p>
+                <div className="botones">
+                  <button type="button" className="boton boton-principal" onClick={() => void iniciar()}>Sí, iniciar</button>
+                  <button type="button" className="boton" autoFocus onClick={() => setConfirmandoNueva(false)}>Cancelar</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {esNueva && (
@@ -316,7 +356,11 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
       {escenario !== undefined && <TarjetaPapel key={`${escenario.id}-${actual === null}`} titulo={escenario.titulo} texto={escenario.tarjetaPapel} abierta={actual === null} />}
 
       {esNueva ? (
-        <FichaNueva ocupado={ocupado} onEnviar={(f) => void iniciarConFicha(f)} />
+        <FichaNueva
+          ocupado={ocupado}
+          idsExistentes={[...oportunidades.map((o) => o.id), ...escenarios.map((e) => e.idCRM)]}
+          onEnviar={(f) => void iniciarConFicha(f)}
+        />
       ) : (
         <div className="lab-cuerpo">
           <Chat
@@ -329,17 +373,21 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
             onEnviar={enviarMensaje}
           />
           <aside className="panel" data-abierto={panelAbierto} aria-label="Diagnóstico">
-            <h2>
-              <button
-                type="button"
-                className="panel-titulo"
-                aria-expanded={panelAbierto}
-                aria-controls="panel-cuerpo"
-                onClick={() => setPanelAbierto((a) => !a)}
-              >
-                Diagnóstico
-              </button>
-            </h2>
+            {escritorio ? (
+              <h2 className="panel-titulo-fijo">Diagnóstico</h2>
+            ) : (
+              <h2>
+                <button
+                  type="button"
+                  className="panel-titulo"
+                  aria-expanded={panelAbierto}
+                  aria-controls="panel-cuerpo"
+                  onClick={() => setPanelAbierto((a) => !a)}
+                >
+                  Diagnóstico
+                </button>
+              </h2>
+            )}
             <div id="panel-cuerpo" className="panel-cuerpo">
               <PanelDiagnostico oportunidad={actual} />
             </div>

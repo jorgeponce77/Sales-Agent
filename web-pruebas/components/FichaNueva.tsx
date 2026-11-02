@@ -4,13 +4,15 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Linea, TipoOportunidad } from 'motor-sales-agent';
 import type { Ficha } from 'agente-sales-agent';
-import { etiquetaEtapa, ETAPAS, LINEAS, MONEDAS, PAISES, TIPOS } from '../lib/catalogos';
+import { etiquetaEtapa, ETAPAS, LINEAS, MONEDAS, PAISES, parsearTcv, TIPOS } from '../lib/catalogos';
 
 /** Lo que captura el formulario; el servidor pone `fechaCreacion` y `vendedor`. */
 export type DatosFicha = Omit<Ficha, 'fechaCreacion' | 'vendedor'>;
 
 interface Props {
   ocupado: boolean;
+  /** IDs del CRM que ya existen en este navegador (guardados o de escenarios): no se pueden repetir. */
+  idsExistentes: readonly string[];
   onEnviar: (ficha: DatosFicha) => void;
 }
 
@@ -23,21 +25,24 @@ const hoyLocal = (): string => {
 /** Revisión ligera en el navegador; la validación que manda es la del servidor. */
 function revisar(v: {
   idCRM: string; cliente: string; oportunidad: string; lineas: Linea[]; tipo: string; tcv: string; fechaCierre: string; etapa: number;
+  idsExistentes: readonly string[];
 }): string[] {
   const errores: string[] = [];
   if (v.idCRM.trim() === '') errores.push('Escribe el ID del CRM.');
+  else if (v.idsExistentes.includes(v.idCRM.trim())) {
+    errores.push('Ya existe una oportunidad con ese ID del CRM. Elige otro, o ábrela desde la lista de oportunidades.');
+  }
   if (v.cliente.trim() === '') errores.push('Escribe el nombre del cliente.');
   if (v.oportunidad.trim() === '') errores.push('Escribe el nombre de la oportunidad.');
   if (v.lineas.length === 0) errores.push('Elige al menos una línea.');
   if (v.tipo === '') errores.push('Elige el tipo de oportunidad.');
-  const monto = Number(v.tcv);
-  if (v.tcv.trim() === '' || !Number.isFinite(monto) || monto <= 0) errores.push('El TCV debe ser un número mayor que 0.');
+  if (parsearTcv(v.tcv) === null) errores.push('El TCV debe ser un número mayor que 0 (por ejemplo, 450000 o 450,000).');
   if (v.fechaCierre === '') errores.push('Elige la fecha de cierre del CRM.');
   else if (v.etapa <= 4 && v.fechaCierre < hoyLocal()) errores.push('La fecha de cierre no puede ser anterior a hoy.');
   return errores;
 }
 
-export default function FichaNueva({ ocupado, onEnviar }: Props) {
+export default function FichaNueva({ ocupado, idsExistentes, onEnviar }: Props) {
   const [idCRM, setIdCRM] = useState('');
   const [cliente, setCliente] = useState('');
   const [oportunidad, setOportunidad] = useState('');
@@ -45,6 +50,7 @@ export default function FichaNueva({ ocupado, onEnviar }: Props) {
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [tipo, setTipo] = useState('');
   const [etapa, setEtapa] = useState(1);
+  const [esRFP, setEsRFP] = useState<'si' | 'no' | 'nose'>('nose');
   const [tcv, setTcv] = useState('');
   const [moneda, setMoneda] = useState('USD');
   const [fechaCierre, setFechaCierre] = useState('');
@@ -56,7 +62,7 @@ export default function FichaNueva({ ocupado, onEnviar }: Props) {
 
   function enviar(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();
-    const fallos = revisar({ idCRM, cliente, oportunidad, lineas, tipo, tcv, fechaCierre, etapa });
+    const fallos = revisar({ idCRM, cliente, oportunidad, lineas, tipo, tcv, fechaCierre, etapa, idsExistentes });
     setErrores(fallos);
     if (fallos.length > 0) return;
     onEnviar({
@@ -67,11 +73,11 @@ export default function FichaNueva({ ocupado, onEnviar }: Props) {
       lineas,
       tipo: tipo as TipoOportunidad,
       etapaCRM: etapa,
-      tcv: Number(tcv),
+      tcv: parsearTcv(tcv) as number,
       moneda,
       fechaCierreCRM: fechaCierre,
       probabilidadCRM: null,
-      esRFP: null,
+      esRFP: esRFP === 'si' ? true : esRFP === 'no' ? false : null,
       ultimaActualizacionCRM: null,
     });
   }
@@ -127,6 +133,16 @@ export default function FichaNueva({ ocupado, onEnviar }: Props) {
         <select value={etapa} onChange={(e) => setEtapa(Number(e.target.value))}>
           {ETAPAS.map((_, i) => <option key={i} value={i}>{etiquetaEtapa(i)}</option>)}
         </select>
+      </label>
+
+      <label>
+        ¿Es RFP?
+        <select value={esRFP} onChange={(e) => setEsRFP(e.target.value as 'si' | 'no' | 'nose')}>
+          <option value="si">Sí</option>
+          <option value="no">No</option>
+          <option value="nose">No sé</option>
+        </select>
+        <span className="ayuda">Con "No sé" se trata como "No".</span>
       </label>
 
       <div className="ficha-fila">

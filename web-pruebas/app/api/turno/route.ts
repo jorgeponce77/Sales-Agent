@@ -1,24 +1,18 @@
 import { crearOportunidad, ejecutarTurno, ESCENARIOS, iniciarSesion, validarFicha } from 'agente-sales-agent';
 import type { Ficha, ModoSesion, Oportunidad, OpcionesTurno } from 'agente-sales-agent';
-import { calcularDiagnostico, validarExpediente } from 'motor-sales-agent';
-import { solicitudConAcceso } from '../../../lib/acceso';
+import { validarExpediente } from 'motor-sales-agent';
 import { obtenerCliente } from '../../../lib/clienteServidor';
 import { hoyMexico } from '../../../lib/hoy';
+import { ERROR_GENERICO, leerOportunidad, leerSolicitud, rechazar, recalcularDiagnostico, responder } from '../../../lib/leerSolicitud';
 import { resumenError } from '../../../lib/resumenError';
-import { esObjeto, MODOS, validarOportunidad } from '../../../lib/validarOportunidad';
+import { esObjeto, MODOS } from '../../../lib/validarOportunidad';
 
 // Con razonamiento, un turno puede hacer hasta ~9 llamadas al modelo.
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
-const MAX_CUERPO = 1024 * 1024; // 1 MB
 const ACCIONES = ['iniciar', 'mensaje', 'cerrar'];
 const VENDEDOR_PRUEBAS = 'prueba';
-
-const GENERICO = 'Error interno, intenta de nuevo.';
-
-const responder = (estado: number, cuerpo: unknown): Response => Response.json(cuerpo, { status: estado });
-const rechazar = (error: string): Response => responder(400, { error });
 
 /** Oportunidad nueva desde una ficha; la valida y devuelve el error en español si no sirve. */
 function oportunidadNueva(ficha: Ficha): Oportunidad | string {
@@ -34,20 +28,9 @@ function oportunidadNueva(ficha: Ficha): Oportunidad | string {
 
 export async function POST(req: Request): Promise<Response> {
   try {
-    if (!solicitudConAcceso(req)) return responder(401, { error: 'Necesitas la contraseña para usar esta página.' });
-
-    const declarado = Number(req.headers.get('content-length'));
-    if (Number.isFinite(declarado) && declarado > MAX_CUERPO) return rechazar('La solicitud es demasiado grande (máximo 1 MB).');
-    const texto = await req.text();
-    if (Buffer.byteLength(texto, 'utf8') > MAX_CUERPO) return rechazar('La solicitud es demasiado grande (máximo 1 MB).');
-
-    let cuerpo: unknown;
-    try {
-      cuerpo = JSON.parse(texto);
-    } catch {
-      return rechazar('La solicitud no es un JSON válido.');
-    }
-    if (!esObjeto(cuerpo)) return rechazar('La solicitud debe ser un objeto JSON.');
+    const solicitud = await leerSolicitud(req);
+    if (!solicitud.ok) return solicitud.respuesta;
+    const cuerpo = solicitud.valor;
 
     const accion = cuerpo['accion'];
     if (typeof accion !== 'string' || !ACCIONES.includes(accion)) {
@@ -66,30 +49,28 @@ export async function POST(req: Request): Promise<Response> {
       return rechazar(`escenarioId: debe ser ${ESCENARIOS.map((e) => e.id).join(', ')}.`);
     }
 
+    // Toda respuesta (incluso la de un turno sin cambios o la de una oportunidad cerrada) trae un diagnóstico
+    // calculado por el servidor: `leerOportunidad` y las ramas de oportunidad nueva lo recalculan.
     const hoy = hoyMexico();
     let oportunidad: Oportunidad;
     if (cuerpo['oportunidad'] !== undefined && cuerpo['oportunidad'] !== null) {
-      const errores = validarOportunidad(cuerpo['oportunidad']);
-      if (errores.length > 0) return rechazar(`La oportunidad no es válida. ${errores.slice(0, 3).join(' ')}`);
-      oportunidad = cuerpo['oportunidad'] as Oportunidad;
+      const leida = leerOportunidad(cuerpo['oportunidad'], hoy);
+      if (!leida.ok) return leida.respuesta;
+      oportunidad = leida.valor;
     } else if (accion !== 'iniciar') {
       return rechazar('oportunidad: es obligatoria para esta acción.');
     } else if (escenario !== undefined) {
       // La ficha del escenario se arma aquí, con la fecha del servidor.
       const nueva = oportunidadNueva(escenario.construirFicha(hoy));
       if (typeof nueva === 'string') throw new Error(`escenario ${escenario.id}: ${nueva}`);
-      oportunidad = nueva;
+      oportunidad = recalcularDiagnostico(nueva, hoy);
     } else if (esObjeto(cuerpo['ficha'])) {
       const nueva = oportunidadNueva({ ...(cuerpo['ficha'] as unknown as Ficha), fechaCreacion: hoy, vendedor: VENDEDOR_PRUEBAS });
       if (typeof nueva === 'string') return rechazar(nueva);
-      oportunidad = nueva;
+      oportunidad = recalcularDiagnostico(nueva, hoy);
     } else {
       return rechazar('Falta la oportunidad, la ficha o el escenario para iniciar.');
     }
-
-    // El diagnóstico que manda el navegador no se usa: se recalcula aquí, así que toda respuesta (incluso la de
-    // un turno sin cambios o la de una oportunidad cerrada) trae un diagnóstico calculado por el servidor.
-    oportunidad.ultimoDiagnostico = calcularDiagnostico(oportunidad.expediente, hoy);
 
     const opciones: OpcionesTurno = {
       cliente: obtenerCliente(),
@@ -103,6 +84,6 @@ export async function POST(req: Request): Promise<Response> {
     return responder(200, resultado);
   } catch (e) {
     console.error('[api/turno] error interno', resumenError(e));
-    return responder(500, { error: GENERICO });
+    return responder(500, { error: ERROR_GENERICO });
   }
 }

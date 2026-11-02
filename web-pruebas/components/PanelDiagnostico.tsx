@@ -70,7 +70,7 @@ export default function PanelDiagnostico({ oportunidad }: { oportunidad: Oportun
         <div>
           <dt>Etapa</dt>
           <dd>
-            CRM: {etiquetaEtapa(d.etapaCRM)}
+            CRM: {etiquetaEtapa(ficha.etapaCRM)}
             <br />
             Recomendada: {etiquetaEtapa(d.etapaRecomendada)} <span className="suave">({COMPARACION[d.comparacionEtapa]})</span>
           </dd>

@@ -37,6 +37,57 @@ describe('obtenerCliente', () => {
     expect(msg.usage.output_tokens).toBe(0);
   });
 
+  it('al pedir terminar, el cliente falso cierra la sesión con la herramienta cerrar_sesion', async () => {
+    vi.stubEnv('MODELO_FALSO', '1');
+    const cliente = obtenerCliente();
+    const opciones = { cliente, hoy: '2026-11-02' };
+    const inicio = await iniciarSesion(oportunidadBase(), 'calificar', opciones);
+    const hablado = await ejecutarTurno(inicio.oportunidad, 'Hola', opciones);
+
+    const cierre = await ejecutarTurno(hablado.oportunidad, '', { ...opciones, cerrar: true });
+    expect(cierre.error).toBeNull();
+    expect(cierre.respuestas).toEqual(['Sesión cerrada. (modo de prueba)']);
+    expect(cierre.oportunidad.sesionActual).toBeNull();
+    expect(cierre.oportunidad.sesiones).toHaveLength(1);
+    expect(cierre.oportunidad.sesiones[0]?.resumen).toBe('Resumen de prueba.');
+    expect(cierre.oportunidad.sesiones[0]?.transcripcion.map((m) => m.texto)).toEqual([
+      '¿Cuál es el estatus del negocio? (modo de prueba)',
+      'Hola',
+      'Gracias, anotado. (modo de prueba)',
+      'Sesión cerrada. (modo de prueba)',
+    ]);
+
+    // La misma oportunidad admite una sesión nueva, con el saludo de siempre.
+    const nueva = await iniciarSesion(cierre.oportunidad, 'calificar', opciones);
+    expect(nueva.respuestas).toEqual(['¿Cuál es el estatus del negocio? (modo de prueba)']);
+    expect(nueva.oportunidad.sesiones).toHaveLength(1);
+  });
+
+  it('el cierre falso responde con un tool_use bien formado y luego con texto al recibir el resultado', async () => {
+    vi.stubEnv('MODELO_FALSO', '1');
+    const cliente = obtenerCliente();
+    const pedido = await cliente.crear({
+      model: 'm',
+      max_tokens: 10,
+      messages: [{ role: 'user', content: [{ type: 'text', text: '[El vendedor pidió terminar la sesión: haz el cierre completo]' }] }],
+    });
+    expect(pedido.stop_reason).toBe('tool_use');
+    const uso = pedido.content.find((b) => b.type === 'tool_use');
+    expect(uso).toEqual(expect.objectContaining({ name: 'cerrar_sesion', input: { resumen: 'Resumen de prueba.' } }));
+
+    const final = await cliente.crear({
+      model: 'm',
+      max_tokens: 10,
+      messages: [
+        { role: 'user', content: [{ type: 'text', text: '[El vendedor pidió terminar la sesión: haz el cierre completo]' }] },
+        { role: 'assistant', content: pedido.content },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: (uso as { id: string }).id, content: '{"ok":true}' }] },
+      ],
+    });
+    expect(final.stop_reason).toBe('end_turn');
+    expect(final.content).toEqual([expect.objectContaining({ type: 'text', text: 'Sesión cerrada. (modo de prueba)' })]);
+  });
+
   it('sin MODELO_FALSO y sin clave de API falla con un mensaje claro y sin filtrar valores', () => {
     vi.stubEnv('MODELO_FALSO', '');
     vi.stubEnv('ANTHROPIC_API_KEY', '');

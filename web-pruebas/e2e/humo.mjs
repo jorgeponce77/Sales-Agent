@@ -83,17 +83,19 @@ async function main() {
     paso('acceso con contraseña');
 
     // Escenario E1: tarjeta de papel e inicio de sesión
+    const agente = pagina.locator('.burbuja-agente');
+    const saludo = agente.filter({ hasText: '¿Cuál es el estatus del negocio?' });
     await pagina.getByLabel('Oportunidad').selectOption({ index: 0 });
     await pagina.getByText('Tu papel', { exact: true }).waitFor();
     await pagina.getByText('Eres Mariana Beltrán').waitFor();
-    await pagina.getByRole('button', { name: 'Iniciar sesión' }).click();
-    await pagina.locator('.burbuja-agente', { hasText: MARCA_MODELO_FALSO }).first().waitFor({ timeout: 20_000 });
+    await pagina.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await agente.filter({ hasText: MARCA_MODELO_FALSO }).first().waitFor({ timeout: 20_000 });
     paso('E1 inició y el agente saludó');
 
     // Un mensaje del vendedor y la segunda respuesta
     await pagina.getByLabel('Tu mensaje').fill('Hola');
     await pagina.getByRole('button', { name: 'Enviar' }).click();
-    await pagina.locator('.burbuja-agente', { hasText: MARCA_MODELO_FALSO }).nth(1).waitFor({ timeout: 20_000 });
+    await agente.filter({ hasText: MARCA_MODELO_FALSO }).nth(1).waitFor({ timeout: 20_000 });
     afirmar(await pagina.locator('.burbuja-propia', { hasText: 'Hola' }).count() === 1, 'el mensaje del vendedor aparece una vez');
     paso('segunda respuesta recibida');
 
@@ -104,17 +106,65 @@ async function main() {
     afirmar((await pagina.locator('.diagnostico').innerText()).includes('BANT'), 'el panel muestra BANT');
     paso(`panel con semáforo (${(await semaforo.innerText()).split('\n')[0]})`);
 
-    // Terminar sesión: la conversación sigue visible
+    // Terminar sesión: el modelo falso cierra con cerrar_sesion; la conversación queda de solo lectura
     await pagina.getByRole('button', { name: 'Terminar sesión' }).click();
-    await pagina.locator('.burbuja-agente', { hasText: MARCA_MODELO_FALSO }).nth(2).waitFor({ timeout: 20_000 });
+    await agente.filter({ hasText: 'Sesión cerrada. (modo de prueba)' }).waitFor({ timeout: 20_000 });
     afirmar(await pagina.locator('.burbuja-propia', { hasText: 'Hola' }).count() === 1, 'la conversación sigue visible tras terminar');
-    afirmar(await pagina.locator('.burbuja-agente', { hasText: MARCA_MODELO_FALSO }).count() >= 3, 'las respuestas previas siguen visibles');
-    paso('terminar sesión conserva la conversación');
+    afirmar(await pagina.locator('.chat-encabezado').count() === 1, 'la sesión cerrada tiene su encabezado');
+    afirmar(await pagina.getByLabel('Tu mensaje').isDisabled(), 'el campo queda deshabilitado sin sesión abierta');
+    afirmar(await pagina.getByRole('button', { name: 'Terminar sesión' }).isDisabled(), '"Terminar sesión" queda deshabilitado');
+    afirmar(await pagina.getByRole('button', { name: 'Iniciar sesión nueva' }).count() === 0, 'sin sesión abierta no se ofrece "Iniciar sesión nueva"');
+    paso('terminar sesión cierra y conserva la conversación en solo lectura');
+
+    // Iniciar sesión sobre la misma oportunidad: saludo nuevo con la sesión pasada arriba
+    await pagina.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await saludo.nth(1).waitFor({ timeout: 20_000 });
+    afirmar(await pagina.locator('.chat-encabezado').count() === 2, 'la sesión pasada sigue arriba de la nueva');
+    afirmar(await pagina.locator('.burbuja-propia', { hasText: 'Hola' }).count() === 1, 'el "Hola" de la sesión pasada sigue visible');
+    afirmar(await pagina.getByLabel('Tu mensaje').isEnabled(), 'el campo se habilita con la sesión nueva');
+    paso('nueva sesión sobre la misma oportunidad, con la anterior arriba');
+
+    // Sesión abierta: "Iniciar sesión nueva" pide confirmación en la página (sin window.confirm)
+    pagina.on('dialog', (d) => { throw new Error(`Apareció un diálogo del navegador: ${d.message()}`); });
+    await pagina.getByRole('button', { name: 'Iniciar sesión nueva' }).click();
+    const confirmacion = pagina.getByRole('group', { name: 'Confirmar nueva sesión' });
+    await confirmacion.getByText('La sesión abierta se guardará como interrumpida. ¿Iniciar una nueva?').waitFor();
+    await confirmacion.getByRole('button', { name: 'Cancelar' }).click();
+    await confirmacion.waitFor({ state: 'detached' });
+    afirmar(await saludo.count() === 2, 'cancelar no inicia otra sesión');
+    await pagina.getByRole('button', { name: 'Iniciar sesión nueva' }).click();
+    await confirmacion.getByRole('button', { name: 'Sí, iniciar' }).click();
+    await saludo.nth(2).waitFor({ timeout: 20_000 });
+    afirmar(await pagina.locator('.chat-encabezado').count() === 3, 'la sesión interrumpida queda archivada arriba');
+    paso('confirmación en línea: cancelar no hace nada y "Sí, iniciar" archiva la abierta y empieza otra');
 
     // Lo guardado sobrevive a una recarga
     await pagina.reload();
     await pagina.locator('.burbuja-propia', { hasText: 'Hola' }).waitFor();
+    afirmar(await pagina.locator('.chat-encabezado').count() === 3, 'tras recargar siguen las 3 sesiones');
     paso('la oportunidad se recupera tras recargar');
+
+    // Nueva oportunidad: no pisa un ID existente; el TCV acepta comas; la ficha completa inicia sesión
+    const selector = pagina.locator('.lab-controles select').first();
+    const campo = (texto) => pagina.locator('.ficha label', { hasText: texto }).locator('input, select').first();
+    await selector.selectOption('nueva');
+    await campo('ID del CRM').fill('OPP-2026-0412');
+    await campo('Cliente').fill('Cliente de humo');
+    await campo('Oportunidad').fill('WMS de humo');
+    await campo('Tipo').selectOption('NN');
+    await pagina.getByLabel('WMS (almacenes)').check();
+    await campo('TCV').fill('450,000');
+    await campo('Fecha de cierre').fill('2027-12-31');
+    await campo('¿Es RFP?').selectOption('no');
+    afirmar(await pagina.evaluate(() => document.documentElement.scrollWidth) <= ANCHO_MOVIL, 'el formulario no desborda a 390 px');
+    await pagina.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await pagina.getByText('Ya existe una oportunidad con ese ID del CRM').waitFor();
+    await campo('ID del CRM').fill('OPP-HUMO-1');
+    await pagina.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await pagina.getByLabel('Tu mensaje').waitFor({ timeout: 20_000 });
+    await saludo.first().waitFor({ timeout: 20_000 });
+    afirmar(await selector.inputValue() === 'op:OPP-HUMO-1', 'la oportunidad nueva queda seleccionada');
+    paso('oportunidad nueva: ID repetido rechazado, TCV con comas y ficha completa aceptados');
 
     // Móvil: captura y sin scroll horizontal
     await pagina.screenshot({ path: join(aqui, 'humo-movil.png'), fullPage: true });
@@ -128,6 +178,8 @@ async function main() {
     const panel = await pagina.locator('.panel').boundingBox();
     afirmar(chat !== null && panel !== null && panel.x >= chat.x + chat.width - 1, 'a 1280 px el panel queda a la derecha del chat');
     afirmar(Math.abs(chat.y - panel.y) < 40, 'a 1280 px chat y panel empiezan a la misma altura');
+    afirmar(await pagina.locator('.panel [aria-expanded]').count() === 0, 'a 1280 px el título del panel no es un botón plegable');
+    await pagina.getByRole('heading', { name: 'Diagnóstico' }).waitFor();
     paso('dos columnas a 1280 px');
 
     afirmar(errores.length === 0, `errores en la consola del navegador:\n${errores.join('\n')}`);
