@@ -9,7 +9,8 @@ import { TIPOS_CAMBIO_DEFAULT } from '../tipos.js';
 import type { Evento, ModoSesion, Oportunidad, ResultadoTurno, SesionActual, TiposCambio, Uso } from '../tipos.js';
 import { MODELO_DEFAULT } from './cliente.js';
 import type { ClienteModelo } from './cliente.js';
-import { agregarUsuario, conCacheEnUltimo } from './historial.js';
+import { depurarFinTurno, depurarLlamada, depurarResultados } from './depuracion.js';
+import { agregarUsuario, conCacheEnUltimo, quitarThinking } from './historial.js';
 
 type MessageParam = Anthropic.Messages.MessageParam;
 type ContentBlockParam = Anthropic.Messages.ContentBlockParam;
@@ -24,7 +25,9 @@ export interface OpcionesTurno {
   registrarError?: (e: unknown) => void;
 }
 
-const MAX_TOKENS = 1024;
+// El spec fijaba 1024, pero claude-sonnet-5-5 piensa por defecto (thinking adaptativo) y el thinking cuenta
+// contra max_tokens: con 1024 casi todas las respuestas se cortaban antes de terminar las herramientas.
+const MAX_TOKENS = 8192;
 const TOPE_HERRAMIENTAS = 8;      // ejecuciones de herramientas por mensaje del vendedor
 const TOPE_TURNOS = 40;           // mensajes del vendedor por sesión
 const MAX_MENSAJE = 4000;         // caracteres por mensaje del vendedor
@@ -34,7 +37,9 @@ const TEXTO_CIERRE = '[El vendedor pidió terminar la sesión: haz el cierre com
 const PREFIJO_VENDEDOR = '(texto del vendedor) ';
 const ERROR_API = 'No pude comunicarme con el asistente. Intenta de nuevo en un momento.';
 const ERROR_LARGO = `Tu mensaje es muy largo (máx. ${MAX_MENSAJE} caracteres). Resume o divídelo.`;
-const RESPALDO = 'Registré lo que me dijiste. ¿Seguimos?';
+const RESPALDO = 'Perdón, se me cortó la respuesta. ¿Me lo repites en pocas palabras?';
+const AVISO_CORTE =
+  '[Tu respuesta anterior se cortó por longitud: solo se ejecutaron las herramientas completas. Repite lo que falte, en partes más cortas.]';
 const TOPE_ALCANZADO = 'tope de herramientas del turno alcanzado';
 const RESUMEN_INTERRUMPIDA = 'Sesión interrumpida sin cierre del agente.';
 
@@ -106,8 +111,10 @@ async function conversar(
     sesionCerrada: null,
   };
   const historial = sesion.historial as MessageParam[];
+  const inicioTurno = historial.length;
   const respuestas: string[] = [];
   let ejecutadas = 0;
+  let llamadas = 0;
 
   for (;;) {
     const final = ejecutadas >= TOPE_HERRAMIENTAS;
@@ -126,40 +133,61 @@ async function conversar(
       throw new FalloApi(undefined, { cause: e });
     }
     sumarUso(uso, msg.usage);
+    llamadas += 1;
+    depurarLlamada(llamadas, final, msg);
 
     const contenido = Array.isArray(msg.content) ? msg.content : [];
-    const usos = contenido.filter((b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use');
-    const continuar = !final && msg.stop_reason === 'tool_use' && usos.length > 0;
+    // Con max_tokens, el último bloque quedó cortado: si es un tool_use, su input puede estar incompleto y no se
+    // ejecuta. Los tool_use anteriores están completos y se ejecutan para que el modelo pueda continuar.
+    const truncada = msg.stop_reason === 'max_tokens';
+    const cortado = truncada ? contenido[contenido.length - 1] : undefined;
+    const usos = contenido.filter(
+      (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use' && b !== cortado,
+    );
+    const continuar = !final && (msg.stop_reason === 'tool_use' || truncada) && usos.length > 0;
 
-    // Se guarda solo texto no vacío y, si se van a ejecutar, los tool_use (R12: nunca un tool_use sin su resultado).
+    // Se guardan, en su orden: los bloques thinking sin cambios (la API exige devolverlos en el ciclo de
+    // herramientas; al terminar el turno se quitan), el texto no vacío y los tool_use que se van a ejecutar
+    // (R12: nunca un tool_use sin su resultado).
     const guardar: ContentBlockParam[] = [];
-    // Otros tipos de bloque se descartan; si se habilita extended thinking, hay que conservar los bloques thinking.
     for (const b of contenido) {
-      if (b.type === 'text' && b.text.trim() !== '') {
+      if (b.type === 'thinking' || b.type === 'redacted_thinking') {
+        guardar.push({ ...b } as ContentBlockParam);
+      } else if (b.type === 'text' && b.text.trim() !== '') {
         guardar.push({ type: 'text', text: b.text });
         respuestas.push(b.text);
-      } else if (continuar && b.type === 'tool_use') {
+      } else if (continuar && b.type === 'tool_use' && usos.includes(b)) {
         guardar.push({ type: 'tool_use', id: b.id, name: b.name, input: b.input });
       }
     }
-    if (guardar.length > 0) historial.push({ role: 'assistant', content: guardar });
+    // Un mensaje con solo thinking no se guarda: no aporta nada y el respaldo ocupa su lugar.
+    if (guardar.some((b) => b.type !== 'thinking' && b.type !== 'redacted_thinking')) {
+      historial.push({ role: 'assistant', content: guardar });
+    }
     if (!continuar) break;
 
+    const resumen: Array<{ nombre: string; ok: boolean | 'tope' }> = [];
     const resultados: ToolResultBlockParam[] = usos.map((u) => {
       if (ejecutadas >= TOPE_HERRAMIENTAS) {
+        resumen.push({ nombre: u.name, ok: 'tope' });
         return { type: 'tool_result', tool_use_id: u.id, is_error: true, content: TOPE_ALCANZADO };
       }
       ejecutadas += 1;
       const r = ejecutarHerramienta(u.name, u.input, estado);
+      resumen.push({ nombre: u.name, ok: r.ok });
       return { type: 'tool_result', tool_use_id: u.id, content: JSON.stringify(r), ...(r.ok ? {} : { is_error: true }) };
     });
-    agregarUsuario(historial, resultados);
+    depurarResultados(resumen);
+    agregarUsuario(historial, truncada ? [...resultados, { type: 'text', text: AVISO_CORTE }] : resultados);
   }
 
-  if (respuestas.length === 0) {
+  const respaldo = respuestas.length === 0;
+  if (respaldo) {
     respuestas.push(RESPALDO);
     historial.push({ role: 'assistant', content: [{ type: 'text', text: RESPALDO }] });
   }
+  quitarThinking(historial, inicioTurno);
+  depurarFinTurno(llamadas, ejecutadas, respaldo);
   return { respuestas, estado };
 }
 

@@ -4,7 +4,7 @@ import { ESCENARIOS } from '../src/index.js';
 import type { Escenario, Mensaje, Oportunidad } from '../src/index.js';
 import { crearOportunidad } from '../src/ficha.js';
 import { verificar } from '../evals/verificaciones.js';
-import { interpretarRespuestaVendedor, responderComoVendedor } from '../evals/vendedorSimulado.js';
+import { hoyEnMexico, interpretarRespuestaVendedor, responderComoVendedor } from '../evals/vendedorSimulado.js';
 import { crearClienteFalso, texto } from './clienteFalso.js';
 import { fichaBase } from './fabrica.js';
 
@@ -193,6 +193,15 @@ describe('responderComoVendedor', () => {
     await responderComoVendedor(cliente, E1, transcripcion, 'm', { hoy: HOY, registrarUso: (u) => usos.push(u) });
     expect(usos).toEqual([{ entrada: 10, salida: 5, cacheLectura: 2, cacheEscritura: 1 }]);
     expect(transcripcion).toEqual([msg('agente', 'Hola')]);
+  });
+});
+
+describe('hoyEnMexico', () => {
+  it('usa la fecha de America/Mexico_City, no la del reloj del servidor', () => {
+    // 03:30 UTC del 3 de noviembre = 21:30 del 2 de noviembre en la Ciudad de México (UTC-6).
+    expect(hoyEnMexico(new Date('2026-11-03T03:30:00Z'))).toBe('2026-11-02');
+    expect(hoyEnMexico(new Date('2026-11-03T06:30:00Z'))).toBe('2026-11-03');
+    expect(hoyEnMexico(new Date('2027-01-05T12:00:00Z'))).toBe('2027-01-05');
   });
 });
 

@@ -4,7 +4,10 @@ import { formatearTranscripcion } from '../src/conversacion/transcripcion.js';
 import { ejecutarTurno, iniciarSesion } from '../src/conversacion/turno.js';
 import { crearOportunidad } from '../src/ficha.js';
 import { VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { Oportunidad } from '../src/tipos.js';
+
+type Message = Anthropic.Messages.Message;
 import { crearClienteFalso, texto, usarHerramienta, usarHerramientas } from './clienteFalso.js';
 import { agregarUsuario, conCacheEnUltimo } from '../src/conversacion/historial.js';
 import { fichaBase } from './fabrica.js';
@@ -12,7 +15,8 @@ import { fichaBase } from './fabrica.js';
 const HOY = '2026-11-02';
 const ERROR_API = 'No pude comunicarme con el asistente. Intenta de nuevo en un momento.';
 const ERROR_LARGO = 'Tu mensaje es muy largo (máx. 4000 caracteres). Resume o divídelo.';
-const FALLBACK = 'Registré lo que me dijiste. ¿Seguimos?';
+const FALLBACK = 'Perdón, se me cortó la respuesta. ¿Me lo repites en pocas palabras?';
+const AVISO_CORTE = '[Tu respuesta anterior se cortó por longitud: solo se ejecutaron las herramientas completas. Repite lo que falte, en partes más cortas.]';
 const TOPE = 'tope de herramientas del turno alcanzado';
 
 const opNueva = (): Oportunidad =>
@@ -264,7 +268,7 @@ describe('ejecutarTurno', () => {
     expect(system[0]?.cache_control).toEqual({ type: 'ephemeral' });
     expect(system[1]?.cache_control).toBeUndefined();
     expect(system[1]?.text).toContain('Modo: revision_rapida');
-    expect(p?.max_tokens).toBe(1024);
+    expect(p?.max_tokens).toBe(8192);
     expect(p?.model).toBe(MODELO_DEFAULT);
     expect(MODELO_DEFAULT).toBe('claude-sonnet-5-5');
     const tools = p?.tools as Array<{ name: string; cache_control?: unknown }>;
@@ -472,6 +476,93 @@ describe('fix ronda 1', () => {
     const r2 = await ejecutarTurno(opNueva(), 'presupuesto', { cliente: crearClienteFalso([soloHerramienta]), hoy: HOY });
     expect(r2.respuestas).toEqual([FALLBACK]);
     esperarHistorialValido(r2.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  // Forma observada con claude-sonnet-5-5 (thinking adaptativo por defecto, display omitido) en la corrida de
+  // diagnóstico: stop_reason max_tokens con [thinking, tool_use, tool_use, tool_use cortado].
+  const THINKING = { type: 'thinking', thinking: '', signature: 'firma-opaca-1' };
+  const respuestaTruncada = (bloquesExtra: unknown[]): Partial<Message> => ({
+    role: 'assistant',
+    content: [THINKING, ...bloquesExtra] as unknown as Message['content'],
+    stop_reason: 'max_tokens',
+    usage: { output_tokens: 1024 } as Message['usage'],
+  });
+
+  it('lote_truncado_ejecuta_las_herramientas_completas_y_deja_continuar_al_modelo', async () => {
+    const truncada = respuestaTruncada([
+      { type: 'tool_use', id: 'toolu_t1', name: 'registrar_influencia', input: { nombre: 'Héctor Salgado' } },
+      { type: 'tool_use', id: 'toolu_t2', name: 'registrar_dato', input: BUDGET },
+      { type: 'tool_use', id: 'toolu_t3', name: 'registrar_dato', input: { campo: 'bant.need' } },
+    ]);
+    const cliente = crearClienteFalso([truncada, texto('Anotado. ¿Quién firma?')]);
+    const r = await ejecutarTurno(opNueva(), 'Te cuento todo', { cliente, hoy: HOY });
+    expect(r.error).toBeNull();
+    expect(cliente.llamadas).toHaveLength(2);
+    expect(r.oportunidad.expediente.influencias.map((i) => i.nombre)).toEqual(['Héctor Salgado']);
+    expect(r.oportunidad.expediente.bant.budget.nivel).toBe('confirmado');
+    expect(r.respuestas).toEqual(['Anotado. ¿Quién firma?']);
+    // El modelo recibe el resultado de las dos completas y el aviso de que la última se perdió.
+    const mensajes = cliente.llamadas[1]?.messages as MensajeApi[];
+    const asistente = mensajes[mensajes.length - 2];
+    expect(bloques(asistente).map((b) => b.type)).toEqual(['thinking', 'tool_use', 'tool_use']);
+    expect(bloques(asistente)[0]).toEqual(THINKING);
+    expect(bloques(asistente).map((b) => b.id)).toEqual([undefined, 'toolu_t1', 'toolu_t2']);
+    const usuario = bloques(mensajes[mensajes.length - 1]);
+    expect(usuario.filter((b) => b.type === 'tool_result').map((b) => b.tool_use_id)).toEqual(['toolu_t1', 'toolu_t2']);
+    expect(usuario.at(-1)?.text).toBe(AVISO_CORTE);
+    esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  it('respuesta_truncada_solo_con_thinking_da_respaldo_y_no_guarda_el_thinking', async () => {
+    const cliente = crearClienteFalso([respuestaTruncada([])]);
+    const r = await ejecutarTurno(opNueva(), 'Te cuento todo', { cliente, hoy: HOY });
+    expect(cliente.llamadas).toHaveLength(1);
+    expect(r.respuestas).toEqual([FALLBACK]);
+    const historial = r.oportunidad.sesionActual?.historial ?? [];
+    esperarHistorialValido(historial);
+    expect(JSON.stringify(historial)).not.toContain('thinking');
+  });
+
+  it('thinking_se_devuelve_sin_cambios_en_el_ciclo_de_herramientas', async () => {
+    const conThinking: Partial<Message> = {
+      role: 'assistant',
+      content: [THINKING, { type: 'tool_use', id: 'toolu_k1', name: 'registrar_dato', input: BUDGET }] as unknown as Message['content'],
+      stop_reason: 'tool_use',
+    };
+    const final: Partial<Message> = {
+      role: 'assistant',
+      content: [{ type: 'redacted_thinking', data: 'opaco' }, { type: 'text', text: 'Anotado.' }] as unknown as Message['content'],
+      stop_reason: 'end_turn',
+    };
+    const cliente = crearClienteFalso([conThinking, final]);
+    const r = await ejecutarTurno(opNueva(), 'El CFO aprobó', { cliente, hoy: HOY });
+    expect(r.oportunidad.expediente.bant.budget.nivel).toBe('confirmado');
+    const enviado = (cliente.llamadas[1]?.messages as MensajeApi[]).at(-2);
+    expect(bloques(enviado)[0]).toEqual(THINKING);
+    esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  // Corrida de diagnóstico 2: el thinking guardado de un turno se reenvió en el siguiente con otro system (la parte
+  // variable cambia en cada turno, R1) y la API respondió 400 "The block is bound to a different conversation".
+  it('thinking_no_pasa_al_turno_siguiente', async () => {
+    const conThinking: Partial<Message> = {
+      role: 'assistant',
+      content: [THINKING, { type: 'tool_use', id: 'toolu_k2', name: 'registrar_dato', input: BUDGET }] as unknown as Message['content'],
+      stop_reason: 'tool_use',
+    };
+    const final: Partial<Message> = {
+      role: 'assistant',
+      content: [{ type: 'redacted_thinking', data: 'opaco' }, { type: 'text', text: 'Anotado.' }] as unknown as Message['content'],
+      stop_reason: 'end_turn',
+    };
+    const cliente = crearClienteFalso([conThinking, final, texto('¿Quién firma?')]);
+    const a = await ejecutarTurno(opNueva(), 'El CFO aprobó', { cliente, hoy: HOY });
+    const historial = a.oportunidad.sesionActual?.historial ?? [];
+    expect(JSON.stringify(historial)).not.toContain('thinking');
+    expect(bloques(historial.at(-1) as MensajeApi)).toEqual([{ type: 'text', text: 'Anotado.' }]);
+    esperarHistorialValido(historial);
+    await ejecutarTurno(a.oportunidad, 'Firma el director', { cliente, hoy: HOY });
+    expect(JSON.stringify(cliente.llamadas[2]?.messages)).not.toContain('thinking');
   });
 
   it('turno_exitoso_no_modifica_la_oportunidad_de_entrada', async () => {

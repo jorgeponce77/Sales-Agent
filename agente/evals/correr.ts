@@ -1,8 +1,8 @@
 /**
  * Evaluaciones con vendedores simulados. Consume saldo de la API: se corre a mano, no forma parte de `npm test`.
  *   npm run evals -w agente-sales-agent -- --escenario E1 --turnos 6
- * Opciones: --escenario E1|E2|E3|E4|E5|todos (default todos) · --turnos N (default 15) · --hoy AAAA-MM-DD
- * Variables: ANTHROPIC_API_KEY (o /home/claude/.secrets/anthropic_key) · MODELO_AGENTE · MODELO_VENDEDOR
+ * Opciones: --escenario E1|E2|E3|E4|E5|todos (default todos) · --turnos N (default 15) · --hoy AAAA-MM-DD (default: hoy en America/Mexico_City)
+ * Variables: ANTHROPIC_API_KEY (o /home/claude/.secrets/anthropic_key) · MODELO_AGENTE · MODELO_VENDEDOR · DEBUG_AGENTE=1 (metadatos de cada llamada a stderr)
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -11,7 +11,7 @@ import {
   crearClienteAnthropic, crearOportunidad, ejecutarTurno, ESCENARIOS, iniciarSesion, MODELO_DEFAULT,
 } from '../src/index.js';
 import type { ClienteModelo, Escenario, Mensaje, Oportunidad, OpcionesTurno, ResultadoTurno, Uso } from '../src/index.js';
-import { hoyLocal, interpretarRespuestaVendedor, responderComoVendedor } from './vendedorSimulado.js';
+import { hoyEnMexico, interpretarRespuestaVendedor, responderComoVendedor } from './vendedorSimulado.js';
 import { verificar } from './verificaciones.js';
 import type { Verificacion } from './verificaciones.js';
 
@@ -45,7 +45,7 @@ interface Argumentos { escenarios: Escenario[]; turnos: number; hoy: string }
 function leerArgumentos(argv: string[]): Argumentos {
   let id = 'todos';
   let turnos = TURNOS_DEFAULT;
-  let hoy = hoyLocal();
+  let hoy = hoyEnMexico();
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const valor = argv[i + 1];

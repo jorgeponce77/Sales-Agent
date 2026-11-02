@@ -32,3 +32,20 @@ export function conCacheEnUltimo(mensajes: readonly MessageParam[]): MessagePara
   copia[copia.length - 1] = { ...ultimo, content: contenido } as MessageParam;
   return copia;
 }
+
+const esThinking = (b: ContentBlockParam): boolean => b.type === 'thinking' || b.type === 'redacted_thinking';
+
+/**
+ * Quita los bloques thinking de los mensajes del asistente desde `desde`. Dentro del ciclo de herramientas de un
+ * turno se devuelven sin cambios (la API lo exige), pero cada bloque está firmado sobre la conversación previa,
+ * system incluido, y la parte variable del system cambia en cada turno: reenviarlos en otro turno da un 400.
+ * Nunca deja un mensaje vacío (un mensaje con solo thinking no se guarda).
+ */
+export function quitarThinking(historial: MessageParam[], desde: number): void {
+  for (let i = Math.max(desde, 0); i < historial.length; i += 1) {
+    const m = historial[i];
+    if (m === undefined || m.role !== 'assistant' || typeof m.content === 'string') continue;
+    const sin = m.content.filter((b) => !esThinking(b));
+    if (sin.length > 0) m.content = sin;
+  }
+}

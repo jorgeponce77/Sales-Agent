@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type { ClienteModelo, Escenario, Mensaje, Uso } from '../src/index.js';
 
 export interface OpcionesVendedor {
-  /** Fecha de hoy (AAAA-MM-DD); los hechos usan fechas relativas a ella. Por defecto, la fecha local de hoy. */
+  /** Fecha de hoy (AAAA-MM-DD); los hechos usan fechas relativas a ella. Por defecto, la fecha de hoy en America/Mexico_City. */
   hoy?: string;
   /** Recibe el uso de tokens de la llamada al modelo. */
   registrarUso?: (uso: Uso) => void;
@@ -12,11 +12,12 @@ const MAX_TOKENS = 1024;
 const LINEA_INICIO = '[Inicio de la conversación]';
 const LINEA_CONTINUA = '[Continúa la conversación]';
 
-/** Fecha local de hoy en formato AAAA-MM-DD. */
-export function hoyLocal(): string {
-  const d = new Date();
-  const dos = (n: number): string => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${dos(d.getMonth() + 1)}-${dos(d.getDate())}`;
+/** Fecha de hoy (AAAA-MM-DD) en la zona America/Mexico_City, sin importar la zona del servidor. */
+export function hoyEnMexico(ahora: Date = new Date()): string {
+  // en-CA formatea como AAAA-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(ahora);
 }
 
 /** Prompt de sistema del vendedor simulado: persona, hechos ocultos, fecha de hoy y datos de la ficha del CRM. */
@@ -83,7 +84,7 @@ export async function responderComoVendedor(
   const msg = await cliente.crear({
     model: modelo,
     max_tokens: MAX_TOKENS,
-    system: construirSistemaVendedor(esc, opciones.hoy ?? hoyLocal()),
+    system: construirSistemaVendedor(esc, opciones.hoy ?? hoyEnMexico()),
     messages: aMensajesApi(transcripcion),
   });
   const u = msg.usage;
