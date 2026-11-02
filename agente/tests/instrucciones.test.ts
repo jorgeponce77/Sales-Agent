@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOGO_REGLAS, calcularDiagnostico } from 'motor-sales-agent';
+import { CATALOGO_REGLAS, CONFIG_DEFAULT, calcularDiagnostico } from 'motor-sales-agent';
 import { crearOportunidad } from '../src/ficha.js';
 import { DEFINICIONES_HERRAMIENTAS } from '../src/herramientas/definiciones.js';
-import { VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
+import { CRITERIOS_INTERNOS, VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
 import { construirInstrucciones } from '../src/instrucciones/construir.js';
 import type { ModoSesion, Oportunidad } from '../src/tipos.js';
 import { fichaBase } from './fabrica.js';
@@ -74,6 +74,19 @@ describe('construirInstrucciones', () => {
   it('variable_lente_director', () => {
     expect(construir(opBeta()).variable).toContain('Lente: director');
     expect(construir(opAlfa()).variable).toContain('Lente: gerente');
+  });
+
+  it('fijo_definiciones_y_excepcion_r7', () => {
+    const { fijo } = construir(opAlfa());
+    expect(fijo).not.toContain('definiciones del director');
+    expect(fijo).not.toContain('Logisoft');
+    expect(fijo).toContain('Excepción para hechos internos de Argano o Netlogistik');
+    expect(fijo).toContain('fuente: "vendedor: <referencia>"');
+    const claves = CONFIG_DEFAULT.criteriosArgano.map((c) => c.clave);
+    for (const clave of CRITERIOS_INTERNOS) {
+      expect(claves).toContain(clave);
+      expect(fijo).toMatch(new RegExp(`\`${clave}\` \\((solo RFP, )?interno\\)`));
+    }
   });
 
   it('version', () => {
