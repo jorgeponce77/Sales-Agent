@@ -6,9 +6,10 @@ import type { EstadoTurno } from '../herramientas/escritura.js';
 import { VERSION_INSTRUCCIONES } from '../instrucciones/base.js';
 import { construirInstrucciones } from '../instrucciones/construir.js';
 import { TIPOS_CAMBIO_DEFAULT } from '../tipos.js';
-import type { ModoSesion, Oportunidad, ResultadoTurno, SesionActual, TiposCambio, Uso } from '../tipos.js';
+import type { Evento, ModoSesion, Oportunidad, ResultadoTurno, SesionActual, TiposCambio, Uso } from '../tipos.js';
 import { MODELO_DEFAULT } from './cliente.js';
 import type { ClienteModelo } from './cliente.js';
+import { agregarUsuario, conCacheEnUltimo } from './historial.js';
 
 type MessageParam = Anthropic.Messages.MessageParam;
 type ContentBlockParam = Anthropic.Messages.ContentBlockParam;
@@ -19,6 +20,8 @@ export interface OpcionesTurno {
   hoy: string;
   modelo?: string;
   tiposCambio?: TiposCambio;
+  /** Recibe la excepción del cliente cuando falla la API (para logs del servidor); nunca llega al resultado. */
+  registrarError?: (e: unknown) => void;
 }
 
 const MAX_TOKENS = 1024;
@@ -33,6 +36,7 @@ const ERROR_API = 'No pude comunicarme con el asistente. Intenta de nuevo en un 
 const ERROR_LARGO = `Tu mensaje es muy largo (máx. ${MAX_MENSAJE} caracteres). Resume o divídelo.`;
 const RESPALDO = 'Registré lo que me dijiste. ¿Seguimos?';
 const TOPE_ALCANZADO = 'tope de herramientas del turno alcanzado';
+const RESUMEN_INTERRUMPIDA = 'Sesión interrumpida sin cierre del agente.';
 
 /** Las 12 herramientas, con cache_control en la última para cachear todo el bloque de herramientas. */
 const HERRAMIENTAS: Anthropic.Messages.Tool[] = DEFINICIONES_HERRAMIENTAS.map((d, i, todas) =>
@@ -61,18 +65,6 @@ const nuevaSesion = (modo: ModoSesion, hoy: string): SesionActual => ({
   transcripcion: [],
 });
 
-/** Agrega bloques como mensaje de usuario; si el último ya es de usuario, se unen (los roles siempre alternan). */
-function agregarUsuario(historial: MessageParam[], bloques: ContentBlockParam[]): void {
-  const ultimo = historial[historial.length - 1];
-  if (ultimo?.role === 'user') {
-    const previo: ContentBlockParam[] =
-      typeof ultimo.content === 'string' ? [{ type: 'text', text: ultimo.content }] : ultimo.content;
-    ultimo.content = [...previo, ...bloques];
-  } else {
-    historial.push({ role: 'user', content: bloques });
-  }
-}
-
 const sinCambios = (op: Oportunidad, error: string | null = null): ResultadoTurno => ({
   respuestas: [],
   oportunidad: op,
@@ -97,6 +89,7 @@ async function conversar(
   sesion: SesionActual,
   o: OpcionesTurno,
   uso: Uso,
+  eventosPrevios: Evento[],
 ): Promise<{ respuestas: string[]; estado: EstadoTurno }> {
   // R1: diagnóstico vigente al inicio del turno; las instrucciones se construyen una vez.
   const diag = calcularDiagnostico(trabajo.expediente, o.hoy);
@@ -108,7 +101,7 @@ async function conversar(
   const estado: EstadoTurno = {
     oportunidad: trabajo,
     hoy: o.hoy,
-    eventos: [],
+    eventos: [...eventosPrevios],
     tiposCambio: o.tiposCambio ?? TIPOS_CAMBIO_DEFAULT,
     sesionCerrada: null,
   };
@@ -126,10 +119,11 @@ async function conversar(
         system,
         tools: HERRAMIENTAS,
         ...(final ? { tool_choice: { type: 'none' as const } } : {}),
-        messages: [...historial],
+        // R17: punto de caché en el último mensaje, solo en la copia enviada.
+        messages: conCacheEnUltimo(historial),
       });
-    } catch {
-      throw new FalloApi();
+    } catch (e) {
+      throw new FalloApi(undefined, { cause: e });
     }
     sumarUso(uso, msg.usage);
 
@@ -139,6 +133,7 @@ async function conversar(
 
     // Se guarda solo texto no vacío y, si se van a ejecutar, los tool_use (R12: nunca un tool_use sin su resultado).
     const guardar: ContentBlockParam[] = [];
+    // Otros tipos de bloque se descartan; si se habilita extended thinking, hay que conservar los bloques thinking.
     for (const b of contenido) {
       if (b.type === 'text' && b.text.trim() !== '') {
         guardar.push({ type: 'text', text: b.text });
@@ -175,13 +170,19 @@ async function correr(
   sesion: SesionActual,
   o: OpcionesTurno,
   esMensajeVendedor: boolean,
+  eventosPrevios: Evento[] = [],
 ): Promise<ResultadoTurno> {
   const uso = usoCero();
   let resultado: { respuestas: string[]; estado: EstadoTurno };
   try {
-    resultado = await conversar(trabajo, sesion, o, uso);
+    resultado = await conversar(trabajo, sesion, o, uso, eventosPrevios);
   } catch (e) {
     if (!(e instanceof FalloApi)) throw e;
+    try {
+      o.registrarError?.(e.cause);
+    } catch {
+      // un registro de errores que falla no debe romper el turno
+    }
     // R11: la oportunidad original sin tocar; el evento de error va solo en el resultado y sin detalles técnicos.
     return {
       ...sinCambios(op, ERROR_API),
@@ -201,6 +202,7 @@ async function correr(
       modo: sesion.modo,
       resumen: estado.sesionCerrada.resumen,
       versionInstrucciones: sesion.versionInstrucciones,
+      transcripcion: sesion.transcripcion,
     });
     trabajo.sesionActual = null;
   }
@@ -218,11 +220,28 @@ async function correr(
 export async function iniciarSesion(op: Oportunidad, modo: ModoSesion, o: OpcionesTurno): Promise<ResultadoTurno> {
   if (op.cerrada) return respuestaCerrada(op);
   const trabajo = structuredClone(op);
+  // R14: una sesión abierta no se pisa: se archiva como interrumpida (sin llamar al modelo).
+  const eventos: Evento[] = [];
+  const abierta = trabajo.sesionActual;
+  if (abierta !== null) {
+    trabajo.sesiones.push({
+      fecha: o.hoy,
+      modo: abierta.modo,
+      resumen: RESUMEN_INTERRUMPIDA,
+      versionInstrucciones: abierta.versionInstrucciones,
+      transcripcion: abierta.transcripcion,
+    });
+    eventos.push({
+      tipo: 'sesion',
+      descripcion: `${RESUMEN_INTERRUMPIDA} Iniciada el ${abierta.inicio} (${abierta.modo}).`,
+      fecha: o.hoy,
+    });
+  }
   const sesion = nuevaSesion(modo, o.hoy);
   trabajo.sesionActual = sesion;
   // Mensaje interno: entra al historial, no a la transcripción.
   agregarUsuario(sesion.historial as MessageParam[], [{ type: 'text', text: textoInicio(modo) }]);
-  return correr(op, trabajo, sesion, o, false);
+  return correr(op, trabajo, sesion, o, false, eventos);
 }
 
 /** Procesa un mensaje del vendedor (o el cierre, con `cerrar`). Nunca modifica `op`. */

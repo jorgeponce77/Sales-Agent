@@ -3,6 +3,9 @@ import type { Mensaje, Oportunidad } from '../tipos.js';
 
 const ROL: Record<Mensaje['rol'], string> = { vendedor: 'Vendedor', agente: 'Agente' };
 
+/** Una línea por mensaje: "Vendedor: …" o "Agente: …". Tolera sesiones guardadas sin transcripción. */
+const mensajes = (t: readonly Mensaje[] | undefined): string[] => (t ?? []).map((m) => `${ROL[m.rol]}: ${m.texto}`);
+
 function bloqueDiagnostico(d: Diagnostico | null): string[] {
   if (d === null) return ['Último diagnóstico', 'Sin diagnóstico todavía.'];
   const banderas = d.banderas.map((b) => `${b.id} (${b.severidad})`);
@@ -16,7 +19,7 @@ function bloqueDiagnostico(d: Diagnostico | null): string[] {
   ];
 }
 
-/** Ficha + sesiones anteriores + transcripción de la sesión en curso + último diagnóstico, en texto plano. */
+/** Ficha + cada sesión pasada (fecha, modo, resumen y mensajes) + la sesión en curso + último diagnóstico, en texto plano. */
 export function formatearTranscripcion(op: Oportunidad): string {
   const f = op.ficha;
   const lineas = [
@@ -24,15 +27,15 @@ export function formatearTranscripcion(op: Oportunidad): string {
     `País ${f.pais} · Líneas ${f.lineas.join(', ')} · Etapa CRM ${f.etapaCRM}${op.cerrada ? ' (cerrada)' : ''} · TCV ${f.tcv} ${f.moneda} · Cierre CRM ${f.fechaCierreCRM} · Vendedor ${f.vendedor}`,
     '',
   ];
-  if (op.sesiones.length > 0) {
-    lineas.push('Sesiones anteriores', ...op.sesiones.map((s) => `- ${s.fecha} (${s.modo}): ${s.resumen}`), '');
-  }
+  op.sesiones.forEach((sesion, i) => {
+    lineas.push(`Sesión ${i + 1} · ${sesion.fecha} · modo ${sesion.modo}`, `Resumen: ${sesion.resumen}`);
+    lineas.push(...mensajes(sesion.transcripcion), '');
+  });
   const s = op.sesionActual;
   if (s === null) {
     lineas.push('Sin sesión en curso.');
   } else {
-    lineas.push(`Conversación (sesión del ${s.inicio}, modo ${s.modo})`);
-    for (const m of s.transcripcion) lineas.push(`${ROL[m.rol]}: ${m.texto}`);
+    lineas.push(`Sesión en curso · ${s.inicio} · modo ${s.modo}`, ...mensajes(s.transcripcion));
   }
   lineas.push('', ...bloqueDiagnostico(op.ultimoDiagnostico));
   return lineas.join('\n');

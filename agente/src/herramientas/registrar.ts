@@ -202,6 +202,12 @@ export const registrarCriterioArgano: Herramienta = segura('registrar_criterio_a
     ]);
   }
 
+  if (esLote && presente(input, 'fuente')) {
+    return rechazar(estado, 'criterios de Argano', [
+      'fuente: en el lote, pon la fuente dentro de cada elemento de criterios ({clave, nivel, fuente})',
+    ]);
+  }
+
   let crudos: unknown[];
   if (esLote) {
     const lista = input['criterios'];

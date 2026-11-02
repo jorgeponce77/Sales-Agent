@@ -269,6 +269,14 @@ describe('registrarCriterioArgano', () => {
     expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
   });
 
+  it('criterio_lote_con_fuente_de_nivel_superior_se_rechaza', () => {
+    const e = estadoBase();
+    const r = registrarCriterioArgano(e, { fuente: 'Laura', criterios: [{ clave, nivel: 'confirmado' }] });
+    expect(r.ok).toBe(false);
+    expect(errores(r).join(' ')).toContain('dentro de cada elemento');
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+  });
+
   it('criterio_interno_confirmado_exige_fuente (R9)', () => {
     const e = estadoBase();
     for (const fuente of [undefined, '', '   ']) {

@@ -64,11 +64,13 @@ describe('construirInstrucciones', () => {
       modo: 'calificar',
       resumen: 'Se identificó a la directora de finanzas como Económica; falta confirmar el presupuesto.',
       versionInstrucciones: VERSION_INSTRUCCIONES,
+      transcripcion: [{ rol: 'vendedor', texto: 'Texto literal de la sesión pasada Z3', fecha: '2026-10-28' }],
     });
     const { variable } = construir(op);
     expect(variable).toContain('Retorno desde 2026-10-28');
     expect(variable).toContain('Se identificó a la directora de finanzas como Económica; falta confirmar el presupuesto.');
     expect(variable).not.toContain('Sesión nueva');
+    expect(variable).not.toContain('Z3'); // R13: la memoria usa solo el resumen
   });
 
   it('variable_lente_director', () => {

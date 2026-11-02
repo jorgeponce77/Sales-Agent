@@ -6,6 +6,7 @@ import { crearOportunidad } from '../src/ficha.js';
 import { VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
 import type { Oportunidad } from '../src/tipos.js';
 import { crearClienteFalso, texto, usarHerramienta, usarHerramientas } from './clienteFalso.js';
+import { agregarUsuario, conCacheEnUltimo } from '../src/conversacion/historial.js';
 import { fichaBase } from './fabrica.js';
 
 const HOY = '2026-11-02';
@@ -28,9 +29,19 @@ const bloques = (m: MensajeApi | undefined): Bloque[] =>
 const toolResults = (mensajes: unknown[]): Bloque[] =>
   (mensajes as MensajeApi[]).flatMap((m) => (m.role === 'user' ? bloques(m).filter((b) => b.type === 'tool_result') : []));
 
-/** Cada tool_use de un mensaje del asistente tiene su tool_result en el mensaje de usuario siguiente (R12). */
+/**
+ * Historial válido para la API (R12): empieza con usuario, los roles alternan, ningún contenido vacío,
+ * y cada tool_use del asistente tiene su tool_result en el mensaje de usuario siguiente.
+ */
 function esperarHistorialValido(historial: unknown[]): void {
   const ms = historial as MensajeApi[];
+  expect(ms[0]?.role).toBe('user');
+  ms.forEach((m, i) => {
+    if (i > 0) expect(m.role).not.toBe(ms[i - 1]?.role);
+    if (typeof m.content === 'string') expect(m.content.trim()).not.toBe('');
+    else expect(m.content.length).toBeGreaterThan(0);
+    for (const b of bloques(m)) if (b.type === 'text') expect((b.text ?? '').trim()).not.toBe('');
+  });
   ms.forEach((m, i) => {
     if (m.role !== 'assistant') return;
     const ids = bloques(m).filter((b) => b.type === 'tool_use').map((b) => b.id);
@@ -217,6 +228,10 @@ describe('ejecutarTurno', () => {
         modo: 'calificar',
         resumen: 'Sin datos nuevos. Diagnóstico en rojo. Sin acciones acordadas.',
         versionInstrucciones: VERSION_INSTRUCCIONES,
+        transcripcion: [
+          { rol: 'agente', texto: 'Hola, ¿cuál es el estatus?', fecha: HOY },
+          { rol: 'agente', texto: 'Cerramos por hoy.', fecha: HOY },
+        ],
       },
     ]);
     expect(r.oportunidad.sesionActual).toBeNull();
@@ -303,6 +318,170 @@ describe('ejecutarTurno', () => {
     expect(r.oportunidad.sesionActual?.historial).toHaveLength(4);
     expect(r.oportunidad.sesionActual?.turnosVendedor).toBe(1);
     expect(r.oportunidad.sesionActual?.transcripcion.map((m) => m.rol)).toEqual(['agente', 'vendedor', 'agente']);
+  });
+});
+
+describe('fix ronda 1', () => {
+  it('sesion_cerrada_conserva_transcripcion_pero_la_memoria_usa_solo_el_resumen (R13)', async () => {
+    const cliente = crearClienteFalso([
+      texto('Saludo único Q7.'),
+      usarHerramienta('cerrar_sesion', { resumen: 'Resumen R13 de la sesión.' }),
+      texto('Adiós.'),
+      texto('Bienvenido de vuelta.'),
+    ]);
+    const inicio = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
+    const cerrado = await ejecutarTurno(inicio.oportunidad, 'Mensaje distintivo del vendedor X9', { cliente, hoy: HOY, cerrar: true });
+    expect(cerrado.oportunidad.sesiones[0]?.transcripcion.map((m) => m.texto)).toEqual([
+      'Saludo único Q7.', 'Mensaje distintivo del vendedor X9', 'Adiós.',
+    ]);
+    await iniciarSesion(cerrado.oportunidad, 'revision_rapida', { cliente, hoy: '2026-11-03' });
+    const variable = (cliente.llamadas[3]?.system as Array<{ text: string }>)[1]?.text ?? '';
+    expect(variable).toContain('Resumen R13 de la sesión.');
+    expect(variable).not.toContain('X9');
+    expect(variable).not.toContain('Q7');
+  });
+
+  it('formatear_imprime_sesiones_pasadas_y_la_actual (R13)', async () => {
+    const cliente = crearClienteFalso([
+      texto('Hola uno.'),
+      usarHerramienta('cerrar_sesion', { resumen: 'Primera sesión resumida.' }),
+      texto('Cierre uno.'),
+      texto('Hola dos.'),
+    ]);
+    const a = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
+    const b = await ejecutarTurno(a.oportunidad, 'Dato de la primera', { cliente, hoy: HOY, cerrar: true });
+    const c = await iniciarSesion(b.oportunidad, 'revision_rapida', { cliente, hoy: '2026-11-05' });
+    const t = formatearTranscripcion(c.oportunidad);
+    const orden = [
+      '2026-11-02', 'calificar', 'Primera sesión resumida.', 'Agente: Hola uno.', 'Vendedor: Dato de la primera',
+      'Agente: Cierre uno.', 'revision_rapida', 'Agente: Hola dos.',
+    ].map((x) => t.indexOf(x));
+    expect(orden.every((i) => i >= 0)).toBe(true);
+    expect([...orden].sort((x, y) => x - y)).toEqual(orden);
+  });
+
+  it('iniciar_con_sesion_abierta_la_archiva (R14)', async () => {
+    const cliente = crearClienteFalso([texto('Hola.'), texto('Anotado.'), texto('Nueva sesión.')]);
+    const a = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
+    const b = await ejecutarTurno(a.oportunidad, 'Vamos bien', { cliente, hoy: HOY });
+    const c = await iniciarSesion(b.oportunidad, 'revision_rapida', { cliente, hoy: '2026-11-04' });
+    expect(cliente.llamadas).toHaveLength(3);
+    expect(c.oportunidad.sesiones).toEqual([
+      {
+        fecha: '2026-11-04',
+        modo: 'calificar',
+        resumen: 'Sesión interrumpida sin cierre del agente.',
+        versionInstrucciones: VERSION_INSTRUCCIONES,
+        transcripcion: b.oportunidad.sesionActual?.transcripcion,
+      },
+    ]);
+    expect(c.oportunidad.sesionActual?.modo).toBe('revision_rapida');
+    expect(c.oportunidad.sesionActual?.transcripcion.map((m) => m.texto)).toEqual(['Nueva sesión.']);
+    expect(c.eventos.filter((e) => e.tipo === 'sesion')).toHaveLength(1);
+    expect(c.oportunidad.eventos.filter((e) => e.tipo === 'sesion')).toHaveLength(1);
+    // El historial de la sesión nueva empieza limpio.
+    expect(cliente.llamadas[2]?.messages).toHaveLength(1);
+  });
+
+  it('registrarError_recibe_la_causa_y_el_resultado_sigue_generico (R15)', async () => {
+    const causa = new Error('529 overloaded');
+    const vistos: unknown[] = [];
+    const cliente = crearClienteFalso([causa]);
+    const r = await ejecutarTurno(opNueva(), 'hola', { cliente, hoy: HOY, registrarError: (e) => vistos.push(e) });
+    expect(vistos).toEqual([causa]);
+    expect(r.error).toBe(ERROR_API);
+    expect(JSON.stringify(r)).not.toContain('529');
+    // Un registrarError que lanza no rompe el turno.
+    const r2 = await ejecutarTurno(opNueva(), 'hola', {
+      cliente: crearClienteFalso([new Error('401')]), hoy: HOY, registrarError: () => { throw new Error('log caído'); },
+    });
+    expect(r2.error).toBe(ERROR_API);
+    // Sin falla no se llama.
+    const nunca: unknown[] = [];
+    await ejecutarTurno(opNueva(), 'hola', { cliente: crearClienteFalso([texto('ok')]), hoy: HOY, registrarError: (e) => nunca.push(e) });
+    expect(nunca).toEqual([]);
+  });
+
+  it('cache_en_el_ultimo_mensaje_solo_en_la_copia (R17)', async () => {
+    const cliente = crearClienteFalso([texto('Hola.'), usarHerramienta('registrar_dato', BUDGET), texto('Anotado.')]);
+    const a = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
+    const b = await ejecutarTurno(a.oportunidad, 'presupuesto', { cliente, hoy: HOY });
+    for (const p of cliente.llamadas) {
+      const marcas = p.messages.flatMap((m) => (typeof m.content === 'string' ? [] : m.content))
+        .filter((blq) => (blq as { cache_control?: unknown }).cache_control !== undefined);
+      expect(marcas).toHaveLength(1);
+      const ultimo = p.messages.at(-1);
+      const ultimoBloque = Array.isArray(ultimo?.content) ? ultimo?.content.at(-1) : undefined;
+      expect((ultimoBloque as { cache_control?: unknown }).cache_control).toEqual({ type: 'ephemeral' });
+    }
+    expect(JSON.stringify(b.oportunidad.sesionActual?.historial)).not.toContain('cache_control');
+    expect(JSON.stringify(a.oportunidad.sesionActual?.historial)).not.toContain('cache_control');
+  });
+
+  it('conCacheEnUltimo_convierte_texto_plano_y_no_muta (R17)', () => {
+    const original = [
+      { role: 'user' as const, content: 'primero' },
+      { role: 'assistant' as const, content: 'respuesta' },
+      { role: 'user' as const, content: 'segundo' },
+    ];
+    const copia = structuredClone(original);
+    const enviado = conCacheEnUltimo(original);
+    expect(original).toEqual(copia);
+    expect(enviado.slice(0, 2)).toEqual(copia.slice(0, 2));
+    expect(enviado[2]).toEqual({ role: 'user', content: [{ type: 'text', text: 'segundo', cache_control: { type: 'ephemeral' } }] });
+    expect(conCacheEnUltimo([])).toEqual([]);
+  });
+
+  it('agregarUsuario_une_con_el_ultimo_de_usuario_incluso_texto_plano', () => {
+    const h: Parameters<typeof agregarUsuario>[0] = [{ role: 'user', content: 'previo' }];
+    agregarUsuario(h, [{ type: 'text', text: 'nuevo' }]);
+    expect(h).toEqual([{ role: 'user', content: [{ type: 'text', text: 'previo' }, { type: 'text', text: 'nuevo' }] }]);
+    h.push({ role: 'assistant', content: [{ type: 'text', text: 'ok' }] });
+    agregarUsuario(h, [{ type: 'text', text: 'otro' }]);
+    expect(h).toHaveLength(3);
+    expect(h[2]).toEqual({ role: 'user', content: [{ type: 'text', text: 'otro' }] });
+  });
+
+  it('turno_une_mensaje_del_vendedor_con_un_usuario_pendiente', async () => {
+    const cliente = crearClienteFalso([texto('Entendido.')]);
+    const op = opNueva();
+    op.sesionActual = {
+      modo: 'calificar', inicio: HOY, turnosVendedor: 1, versionInstrucciones: VERSION_INSTRUCCIONES,
+      historial: [{ role: 'user', content: 'texto pendiente' }], transcripcion: [],
+    };
+    const r = await ejecutarTurno(op, 'hola', { cliente, hoy: HOY });
+    expect(cliente.llamadas[0]?.messages).toHaveLength(1);
+    expect(bloques(cliente.llamadas[0]?.messages[0] as MensajeApi).map((b) => b.text)).toEqual(['texto pendiente', 'hola']);
+    esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  it('tool_use_en_respuesta_que_no_paro_por_herramienta_se_descarta (R12)', async () => {
+    const truncada = usarHerramientas([{ name: 'registrar_dato', input: BUDGET }], 'Parcial.');
+    truncada.stop_reason = 'max_tokens';
+    const cliente = crearClienteFalso([truncada]);
+    const r = await ejecutarTurno(opNueva(), 'presupuesto', { cliente, hoy: HOY });
+    expect(cliente.llamadas).toHaveLength(1);
+    expect(r.oportunidad.expediente.bant.budget.nivel).toBe('ausente');
+    expect(r.respuestas).toEqual(['Parcial.']);
+    const historial = r.oportunidad.sesionActual?.historial ?? [];
+    esperarHistorialValido(historial);
+    expect(JSON.stringify(historial)).not.toContain('tool_use');
+
+    const soloHerramienta = usarHerramienta('registrar_dato', BUDGET);
+    soloHerramienta.stop_reason = 'max_tokens';
+    const r2 = await ejecutarTurno(opNueva(), 'presupuesto', { cliente: crearClienteFalso([soloHerramienta]), hoy: HOY });
+    expect(r2.respuestas).toEqual([FALLBACK]);
+    esperarHistorialValido(r2.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  it('turno_exitoso_no_modifica_la_oportunidad_de_entrada', async () => {
+    const cliente = crearClienteFalso([texto('Hola.'), usarHerramienta('registrar_dato', BUDGET), texto('Anotado.')]);
+    const a = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
+    const copia = structuredClone(a.oportunidad);
+    const b = await ejecutarTurno(a.oportunidad, 'El CFO confirmó', { cliente, hoy: HOY });
+    expect(b.error).toBeNull();
+    expect(b.oportunidad.expediente.bant.budget.nivel).toBe('confirmado');
+    expect(a.oportunidad).toEqual(copia);
   });
 });
 
