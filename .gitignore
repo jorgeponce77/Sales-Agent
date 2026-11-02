@@ -5,3 +5,4 @@ dist/
 .secrets/
 agente/evals/informes/
 .next/
+agente/dist-evals/
