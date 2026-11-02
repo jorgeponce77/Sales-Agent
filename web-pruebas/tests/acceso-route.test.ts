@@ -60,6 +60,44 @@ describe('POST /api/acceso', () => {
   });
 });
 
+describe('POST /api/acceso: tamaño del cuerpo', () => {
+  const grande = JSON.stringify({ clave: 'x'.repeat(4 * 1024) });
+
+  it('más de 4 KB según content-length: 400 sin leer el cuerpo', async () => {
+    const req = new Request('http://localhost/api/acceso', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': String(4 * 1024 + 1) },
+      body: JSON.stringify({ clave: CLAVE }),
+    });
+    const lector = vi.spyOn(req, 'text');
+    const r = await acceso(req);
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: 'Solicitud inválida' });
+    expect(r.headers.get('set-cookie')).toBeNull();
+    expect(lector).not.toHaveBeenCalled();
+  });
+
+  it('más de 4 KB de texto real, aunque content-length diga poco: 400', async () => {
+    const req = new Request('http://localhost/api/acceso', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'content-length': '10' },
+      body: grande,
+    });
+    const r = await acceso(req);
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: 'Solicitud inválida' });
+  });
+
+  it('más de 4 KB sin content-length: 400', async () => {
+    const r = await acceso(pedir(grande));
+    expect(r.status).toBe(400);
+  });
+
+  it('un cuerpo normal sigue funcionando', async () => {
+    expect((await acceso(pedir({ clave: CLAVE }))).status).toBe(200);
+  });
+});
+
 describe('POST /api/salir', () => {
   it('borra la cookie', async () => {
     const r = await salir();

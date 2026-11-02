@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { iniciarSesion } from 'agente-sales-agent';
+import { iniciarSesion, MODELO_DEFAULT } from 'agente-sales-agent';
 import type { ResultadoTurno } from 'agente-sales-agent';
+import { calcularDiagnostico } from 'motor-sales-agent';
 import { obtenerCliente } from '../lib/clienteServidor';
 import { hoyMexico } from '../lib/hoy';
 import { maxDuration, POST, runtime } from '../app/api/turno/route';
@@ -170,8 +171,16 @@ describe('solicitudes inválidas', () => {
     expect(lector).not.toHaveBeenCalled();
   });
 
-  it('cuerpo de más de 1 MB: 400 también si content-length no viene o miente', async () => {
+  it('cuerpo de más de 1 MB: 400 si content-length no viene', async () => {
     const { estado, json } = await llamar({ accion: 'mensaje', oportunidad: oportunidadBase(), mensaje: 'x'.repeat(1024 * 1024 + 1) });
+    expect(estado).toBe(400);
+    expect(json.error).toMatch(/grande|1 MB/);
+    expect(crear).not.toHaveBeenCalled();
+  });
+
+  it('cuerpo de más de 1 MB: 400 aunque content-length declare poco', async () => {
+    const cuerpo = { accion: 'mensaje', oportunidad: oportunidadBase(), mensaje: 'x'.repeat(1024 * 1024 + 1) };
+    const { estado, json } = await llamar(cuerpo, { encabezados: { 'content-length': '10' } });
     expect(estado).toBe(400);
     expect(json.error).toMatch(/grande|1 MB/);
     expect(crear).not.toHaveBeenCalled();
@@ -256,7 +265,7 @@ describe('turnos', () => {
 
   it('el modelo sale de MODELO_AGENTE y, si no hay, el del agente por defecto', async () => {
     await llamar({ accion: 'iniciar', ficha: fichaBase() });
-    expect(crear.mock.calls[0]![0]).toMatchObject({ model: 'claude-sonnet-5-5' });
+    expect(crear.mock.calls[0]![0]).toMatchObject({ model: MODELO_DEFAULT });
     vi.stubEnv('MODELO_AGENTE', 'modelo-de-prueba');
     await llamar({ accion: 'iniciar', ficha: fichaBase() });
     expect(crear.mock.calls[1]![0]).toMatchObject({ model: 'modelo-de-prueba' });
@@ -266,6 +275,44 @@ describe('turnos', () => {
     vi.mocked(hoyMexico).mockReturnValue('2026-12-15');
     const { json } = await llamar({ accion: 'iniciar', ficha: fichaBase() });
     expect(json.oportunidad.sesionActual.inicio).toBe('2026-12-15');
+  });
+});
+
+describe('diagnóstico', () => {
+  const falso = { ...structuredClone(calcularDiagnostico(oportunidadBase().expediente, '2026-11-02')), nivelMadurez: 'FALSIFICADO' };
+
+  it('el ultimoDiagnostico del navegador se reemplaza por el calculado en el servidor', async () => {
+    const op = { ...structuredClone(oportunidadBase()), ultimoDiagnostico: falso };
+    const esperado = calcularDiagnostico(op.expediente, '2026-11-02');
+    const { estado, json } = await llamar({ accion: 'mensaje', oportunidad: op, mensaje: 'Hola' });
+    expect(estado).toBe(200);
+    expect(json.oportunidad.ultimoDiagnostico).toEqual(esperado);
+    expect(json.diagnostico).toEqual(esperado);
+    expect(JSON.stringify(json)).not.toContain('FALSIFICADO');
+  });
+
+  it('también en un turno sin cambios (mensaje vacío)', async () => {
+    const op = { ...structuredClone(oportunidadBase()), ultimoDiagnostico: falso };
+    const { json } = await llamar({ accion: 'mensaje', oportunidad: op, mensaje: '   ' });
+    expect(crear).not.toHaveBeenCalled();
+    expect(json.diagnostico).toEqual(calcularDiagnostico(op.expediente, '2026-11-02'));
+    expect(JSON.stringify(json)).not.toContain('FALSIFICADO');
+  });
+
+  it('también en una oportunidad cerrada', async () => {
+    const cerrada = oportunidadBase({ etapaCRM: 7 });
+    const op = { ...structuredClone(cerrada), ultimoDiagnostico: falso };
+    const { json } = await llamar({ accion: 'mensaje', oportunidad: op, mensaje: 'Hola' });
+    expect(crear).not.toHaveBeenCalled();
+    expect(json.diagnostico).toEqual(calcularDiagnostico(op.expediente, '2026-11-02'));
+    expect(JSON.stringify(json)).not.toContain('FALSIFICADO');
+  });
+
+  it('usa la fecha de hoy del servidor', async () => {
+    vi.mocked(hoyMexico).mockReturnValue('2027-02-01');
+    const op = { ...structuredClone(oportunidadBase()), ultimoDiagnostico: falso };
+    const { json } = await llamar({ accion: 'mensaje', oportunidad: op, mensaje: '' });
+    expect(json.diagnostico).toEqual(calcularDiagnostico(op.expediente, '2027-02-01'));
   });
 });
 

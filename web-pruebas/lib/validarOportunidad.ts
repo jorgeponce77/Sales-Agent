@@ -1,14 +1,16 @@
 import { validarFicha } from 'agente-sales-agent';
+import type { ModoSesion } from 'agente-sales-agent';
 import { validarExpediente } from 'motor-sales-agent';
 
-const MODOS = ['calificar', 'revision_rapida'];
+export const MODOS: readonly ModoSesion[] = ['calificar', 'revision_rapida'];
+const esModo = (x: unknown): x is ModoSesion => (MODOS as readonly unknown[]).includes(x);
 const ROLES_MENSAJE = ['vendedor', 'agente'];
 const TIPOS_BLOQUE = ['text', 'tool_use', 'tool_result', 'thinking', 'redacted_thinking'];
 const MAX_ERRORES_EXPEDIENTE = 5;
 const TOPE_TURNOS = 40;
 
 type Obj = Record<string, unknown>;
-const esObjeto = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
+export const esObjeto = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const esTexto = (x: unknown): x is string => typeof x === 'string';
 
 /** Errores de una transcripción (lista de `{rol, texto, fecha}`). */
@@ -40,7 +42,7 @@ function validarSesionActual(s: unknown): string[] {
   if (s === null) return [];
   if (!esObjeto(s)) return ['sesionActual: debe ser null o un objeto.'];
   const errores: string[] = [];
-  if (!MODOS.includes(s['modo'] as string)) errores.push('sesionActual.modo: debe ser calificar o revision_rapida.');
+  if (!esModo(s['modo'])) errores.push('sesionActual.modo: debe ser calificar o revision_rapida.');
   if (!esTexto(s['inicio'])) errores.push('sesionActual.inicio: debe ser texto.');
   const turnos = s['turnosVendedor'];
   if (typeof turnos !== 'number' || !Number.isInteger(turnos) || turnos < 0 || turnos > TOPE_TURNOS) {
@@ -70,7 +72,7 @@ function validarSesiones(sesiones: unknown): string[] {
     if (!esObjeto(s)) return [`${ruta}: debe ser un objeto.`];
     if (!esTexto(s['fecha'])) return [`${ruta}.fecha: debe ser texto.`];
     if (!esTexto(s['resumen'])) return [`${ruta}.resumen: debe ser texto.`];
-    if (!MODOS.includes(s['modo'] as string)) return [`${ruta}.modo: debe ser calificar o revision_rapida.`];
+    if (!esModo(s['modo'])) return [`${ruta}.modo: debe ser calificar o revision_rapida.`];
     // Las sesiones guardadas antes de que existiera la transcripción no la traen: se tratan como vacías.
     if (s['transcripcion'] !== undefined) {
       const e = validarTranscripcion(s['transcripcion'], `${ruta}.transcripcion`);

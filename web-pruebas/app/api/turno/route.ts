@@ -1,11 +1,11 @@
 import { crearOportunidad, ejecutarTurno, ESCENARIOS, iniciarSesion, validarFicha } from 'agente-sales-agent';
 import type { Ficha, ModoSesion, Oportunidad, OpcionesTurno } from 'agente-sales-agent';
-import { validarExpediente } from 'motor-sales-agent';
+import { calcularDiagnostico, validarExpediente } from 'motor-sales-agent';
 import { solicitudConAcceso } from '../../../lib/acceso';
 import { obtenerCliente } from '../../../lib/clienteServidor';
 import { hoyMexico } from '../../../lib/hoy';
 import { resumenError } from '../../../lib/resumenError';
-import { validarOportunidad } from '../../../lib/validarOportunidad';
+import { esObjeto, MODOS, validarOportunidad } from '../../../lib/validarOportunidad';
 
 // Con razonamiento, un turno puede hacer hasta ~9 llamadas al modelo.
 export const runtime = 'nodejs';
@@ -13,15 +13,12 @@ export const maxDuration = 300;
 
 const MAX_CUERPO = 1024 * 1024; // 1 MB
 const ACCIONES = ['iniciar', 'mensaje', 'cerrar'];
-const MODOS: ModoSesion[] = ['calificar', 'revision_rapida'];
 const VENDEDOR_PRUEBAS = 'prueba';
 
 const GENERICO = 'Error interno, intenta de nuevo.';
 
 const responder = (estado: number, cuerpo: unknown): Response => Response.json(cuerpo, { status: estado });
 const rechazar = (error: string): Response => responder(400, { error });
-
-const esObjeto = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
 /** Oportunidad nueva desde una ficha; la valida y devuelve el error en español si no sirve. */
 function oportunidadNueva(ficha: Ficha): Oportunidad | string {
@@ -57,7 +54,7 @@ export async function POST(req: Request): Promise<Response> {
       return rechazar(`accion: debe ser ${ACCIONES.join(', ')}.`);
     }
     const modo = cuerpo['modo'];
-    if (modo !== undefined && (typeof modo !== 'string' || !MODOS.includes(modo as ModoSesion))) {
+    if (modo !== undefined && (typeof modo !== 'string' || !(MODOS as readonly string[]).includes(modo))) {
       return rechazar(`modo: debe ser ${MODOS.join(' o ')}.`);
     }
     const mensaje = cuerpo['mensaje'];
@@ -89,6 +86,10 @@ export async function POST(req: Request): Promise<Response> {
     } else {
       return rechazar('Falta la oportunidad, la ficha o el escenario para iniciar.');
     }
+
+    // El diagnóstico que manda el navegador no se usa: se recalcula aquí, así que toda respuesta (incluso la de
+    // un turno sin cambios o la de una oportunidad cerrada) trae un diagnóstico calculado por el servidor.
+    oportunidad.ultimoDiagnostico = calcularDiagnostico(oportunidad.expediente, hoy);
 
     const opciones: OpcionesTurno = {
       cliente: obtenerCliente(),
