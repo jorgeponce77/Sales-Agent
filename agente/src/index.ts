@@ -5,3 +5,5 @@ export type { ClienteModelo } from './conversacion/cliente.js';
 export { iniciarSesion, ejecutarTurno } from './conversacion/turno.js';
 export type { OpcionesTurno } from './conversacion/turno.js';
 export { formatearTranscripcion } from './conversacion/transcripcion.js';
+export { ESCENARIOS } from './escenarios/index.js';
+export type { Escenario } from './escenarios/index.js';

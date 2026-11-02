@@ -6,7 +6,12 @@ import {
   construirContexto,
   CONFIG_DEFAULT,
   evaluarBanderas,
+  diasHabilesEntre,
+  esHabil,
   evaluarFortalezas,
+  finDeTrimestre,
+  sumarDiasHabiles,
+  sumarDiasNaturales,
   type Contexto,
 } from '../src/index.js';
 import { REGLAS_FORTALEZAS } from '../src/reglas/index.js';
@@ -47,5 +52,15 @@ describe('API pública (I4)', () => {
     expect(Object.isFrozen(CATALOGO_FORTALEZAS_IDS)).toBe(true);
     expect(() => { (CATALOGO_REGLAS as unknown as unknown[]).push({}); }).toThrow();
     expect(() => { (CATALOGO_FORTALEZAS_IDS as unknown as string[]).push('x'); }).toThrow();
+  });
+
+  it('exporta los ayudantes de fechas para los consumidores del motor (R18)', () => {
+    const festivos = CONFIG_DEFAULT.festivos['MX'] ?? [];
+    expect(esHabil('2026-11-16', festivos)).toBe(false);
+    expect(esHabil('2026-11-17', festivos)).toBe(true);
+    expect(sumarDiasNaturales('2026-11-02', 28)).toBe('2026-11-30');
+    expect(sumarDiasHabiles('2026-11-13', 1, festivos)).toBe('2026-11-17');
+    expect(diasHabilesEntre('2026-11-13', '2026-11-17', festivos)).toBe(1);
+    expect(finDeTrimestre('2026-11-02')).toBe('2026-12-31');
   });
 });
