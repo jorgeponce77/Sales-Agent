@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import { hoyEnMexico } from '../src/index.js';
 import type { ClienteModelo, Escenario, Mensaje, Uso } from '../src/index.js';
 
 export interface OpcionesVendedor {
@@ -8,17 +9,9 @@ export interface OpcionesVendedor {
   registrarUso?: (uso: Uso) => void;
 }
 
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 2048;
 const LINEA_INICIO = '[Inicio de la conversación]';
 const LINEA_CONTINUA = '[Continúa la conversación]';
-
-/** Fecha de hoy (AAAA-MM-DD) en la zona America/Mexico_City, sin importar la zona del servidor. */
-export function hoyEnMexico(ahora: Date = new Date()): string {
-  // en-CA formatea como AAAA-MM-DD.
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(ahora);
-}
 
 /** Prompt de sistema del vendedor simulado: persona, hechos ocultos, fecha de hoy y datos de la ficha del CRM. */
 export function construirSistemaVendedor(esc: Escenario, hoy: string): string {
@@ -48,12 +41,15 @@ HECHOS (tu conocimiento; el asistente no los tiene)
 ${esc.hechosOcultos}`;
 }
 
-/** Quita la marca FIN del final de la respuesta del vendedor simulado. Solo cuenta si es la última palabra completa. */
+/**
+ * Quita la marca FIN del final de la respuesta del vendedor simulado. Solo cuenta si es la última palabra completa;
+ * tolera puntuación final y marcas de markdown alrededor (`FIN.`, `FIN!`, `**FIN**`).
+ */
 export function interpretarRespuestaVendedor(respuesta: string): { mensaje: string; fin: boolean } {
   const t = respuesta.trim();
-  const m = /(?:^|[\s.!?¡¿,;:"')\]])FIN$/.exec(t);
+  const m = /(^|[\s.!?¡¿,;:"')\]])[*_~`]*FIN[*_~`]*[.!?…]*$/u.exec(t);
   if (m === null) return { mensaje: t, fin: false };
-  return { mensaje: t.slice(0, t.length - 3).trim(), fin: true };
+  return { mensaje: t.slice(0, m.index + (m[1] ?? '').length).trim(), fin: true };
 }
 
 /**
@@ -73,7 +69,11 @@ function aMensajesApi(transcripcion: readonly Mensaje[]): Anthropic.Messages.Mes
   return salida;
 }
 
-/** Siguiente mensaje del vendedor simulado, dado lo conversado hasta ahora. Puede terminar en FIN. */
+/**
+ * Siguiente mensaje del vendedor simulado, dado lo conversado hasta ahora. Puede terminar en FIN.
+ * Si la respuesta se cortó (max_tokens) o viene vacía, reintenta una vez; si el reintento viene vacío se queda
+ * con la primera (aunque esté cortada) y, si ambas vienen vacías, devuelve ''.
+ */
 export async function responderComoVendedor(
   cliente: ClienteModelo,
   esc: Escenario,
@@ -81,22 +81,29 @@ export async function responderComoVendedor(
   modelo: string,
   opciones: OpcionesVendedor = {},
 ): Promise<string> {
-  const msg = await cliente.crear({
-    model: modelo,
-    max_tokens: MAX_TOKENS,
-    system: construirSistemaVendedor(esc, opciones.hoy ?? hoyEnMexico()),
-    messages: aMensajesApi(transcripcion),
-  });
-  const u = msg.usage;
-  opciones.registrarUso?.({
-    entrada: u?.input_tokens ?? 0,
-    salida: u?.output_tokens ?? 0,
-    cacheLectura: u?.cache_read_input_tokens ?? 0,
-    cacheEscritura: u?.cache_creation_input_tokens ?? 0,
-  });
-  const contenido = Array.isArray(msg.content) ? msg.content : [];
-  return contenido
-    .flatMap((b) => (b.type === 'text' ? [b.text] : []))
-    .join('')
-    .trim();
+  const pedir = async (): Promise<{ texto: string; cortada: boolean }> => {
+    const msg = await cliente.crear({
+      model: modelo,
+      max_tokens: MAX_TOKENS,
+      system: construirSistemaVendedor(esc, opciones.hoy ?? hoyEnMexico()),
+      messages: aMensajesApi(transcripcion),
+    });
+    const u = msg.usage;
+    opciones.registrarUso?.({
+      entrada: u?.input_tokens ?? 0,
+      salida: u?.output_tokens ?? 0,
+      cacheLectura: u?.cache_read_input_tokens ?? 0,
+      cacheEscritura: u?.cache_creation_input_tokens ?? 0,
+    });
+    const contenido = Array.isArray(msg.content) ? msg.content : [];
+    const texto = contenido
+      .flatMap((b) => (b.type === 'text' ? [b.text] : []))
+      .join('')
+      .trim();
+    return { texto, cortada: msg.stop_reason === 'max_tokens' };
+  };
+  const primera = await pedir();
+  if (primera.texto !== '' && !primera.cortada) return primera.texto;
+  const segunda = await pedir();
+  return segunda.texto !== '' ? segunda.texto : primera.texto;
 }

@@ -1,12 +1,15 @@
+import type Anthropic from '@anthropic-ai/sdk';
 import { calcularDiagnostico } from 'motor-sales-agent';
 import { describe, expect, it } from 'vitest';
 import { ESCENARIOS } from '../src/index.js';
 import type { Escenario, Mensaje, Oportunidad } from '../src/index.js';
 import { crearOportunidad } from '../src/ficha.js';
 import { verificar } from '../evals/verificaciones.js';
-import { hoyEnMexico, interpretarRespuestaVendedor, responderComoVendedor } from '../evals/vendedorSimulado.js';
+import { interpretarRespuestaVendedor, responderComoVendedor } from '../evals/vendedorSimulado.js';
 import { crearClienteFalso, texto } from './clienteFalso.js';
 import { fichaBase } from './fabrica.js';
+
+type Message = Anthropic.Messages.Message;
 
 const HOY = '2026-11-02';
 const E1 = ESCENARIOS.find((e) => e.id === 'E1') as Escenario;
@@ -15,12 +18,12 @@ const E5 = ESCENARIOS.find((e) => e.id === 'E5') as Escenario;
 const msg = (rol: Mensaje['rol'], t: string): Mensaje => ({ rol, texto: t, fecha: HOY });
 
 /** Oportunidad armada a mano: una sesión cerrada con los mensajes dados y un diagnóstico con las banderas dadas. */
-function opCon(mensajes: Mensaje[], banderas: string[] = [], over: Partial<Oportunidad> = {}): Oportunidad {
+function opCon(mensajes: Mensaje[], banderas: string[] = []): Oportunidad {
   const op = crearOportunidad(fichaBase());
   const diag = calcularDiagnostico(op.expediente, HOY);
   op.sesiones.push({ fecha: HOY, modo: 'calificar', resumen: 'r', versionInstrucciones: 'v', transcripcion: mensajes });
   op.ultimoDiagnostico = { ...diag, banderas: banderas.map((id) => ({ id, severidad: 'alta' as const, texto: id })) };
-  return Object.assign(op, over);
+  return op;
 }
 
 const por = (esc: Escenario, op: Oportunidad, nombre: string) => {
@@ -96,6 +99,13 @@ describe('verificar: sin_personas_inventadas', () => {
 
   it('sin influencias pasa', () => {
     expect(por(E1, opCon([msg('agente', ES)]), 'sin_personas_inventadas').ok).toBe(true);
+  });
+
+  it('los nombres se comparan por palabras completas: "Ana" no coincide con "semana"', () => {
+    const esc: Escenario = { ...E1, hechosOcultos: 'La próxima semana decide Héctor Salgado.' };
+    expect(por(esc, conInfluencia('Ana'), 'sin_personas_inventadas').ok).toBe(false);
+    expect(por(esc, conInfluencia('Héctor'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(esc, conInfluencia('Salgado'), 'sin_personas_inventadas').ok).toBe(true);
   });
 });
 
@@ -184,6 +194,41 @@ describe('responderComoVendedor', () => {
     expect(cliente.llamadas[1]?.messages.map((m) => m.role)).toEqual(['user', 'assistant', 'user']);
   });
 
+  it('usa max_tokens 2048 y reintenta una vez si la respuesta se cortó', async () => {
+    const cortada: Partial<Message> = { ...texto('Mira, te cuento que el comi'), stop_reason: 'max_tokens' };
+    const cliente = crearClienteFalso([cortada, texto('El comité decide en diciembre.')]);
+    const usos: unknown[] = [];
+    const r = await responderComoVendedor(cliente, E1, [msg('agente', 'Hola')], 'm', { hoy: HOY, registrarUso: (u) => usos.push(u) });
+    expect(r).toBe('El comité decide en diciembre.');
+    expect(cliente.llamadas).toHaveLength(2);
+    expect(cliente.llamadas.map((l) => l.max_tokens)).toEqual([2048, 2048]);
+    expect(usos).toHaveLength(2);
+  });
+
+  it('reintenta una vez si la respuesta viene vacía', async () => {
+    const cliente = crearClienteFalso([texto('  '), texto('Todo bien.')]);
+    expect(await responderComoVendedor(cliente, E1, [msg('agente', 'Hola')], 'm', { hoy: HOY })).toBe('Todo bien.');
+    expect(cliente.llamadas).toHaveLength(2);
+  });
+
+  it('si sigue vacía tras el reintento devuelve "" sin un tercer intento', async () => {
+    const cliente = crearClienteFalso([texto(''), texto(''), texto('no debería usarse')]);
+    expect(await responderComoVendedor(cliente, E1, [msg('agente', 'Hola')], 'm', { hoy: HOY })).toBe('');
+    expect(cliente.llamadas).toHaveLength(2);
+  });
+
+  it('si se cortó y el reintento viene vacío, se queda con el texto cortado', async () => {
+    const cortada: Partial<Message> = { ...texto('Mira, te cuento'), stop_reason: 'max_tokens' };
+    const cliente = crearClienteFalso([cortada, texto('')]);
+    expect(await responderComoVendedor(cliente, E1, [msg('agente', 'Hola')], 'm', { hoy: HOY })).toBe('Mira, te cuento');
+  });
+
+  it('una respuesta completa no se reintenta', async () => {
+    const cliente = crearClienteFalso([texto('Hola.'), texto('no debería usarse')]);
+    expect(await responderComoVendedor(cliente, E1, [msg('agente', 'Hola')], 'm', { hoy: HOY })).toBe('Hola.');
+    expect(cliente.llamadas).toHaveLength(1);
+  });
+
   it('reporta el uso del vendedor y no muta la transcripción', async () => {
     const cliente = crearClienteFalso([
       texto('ok', { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 2, cache_creation_input_tokens: 1 }),
@@ -196,15 +241,6 @@ describe('responderComoVendedor', () => {
   });
 });
 
-describe('hoyEnMexico', () => {
-  it('usa la fecha de America/Mexico_City, no la del reloj del servidor', () => {
-    // 03:30 UTC del 3 de noviembre = 21:30 del 2 de noviembre en la Ciudad de México (UTC-6).
-    expect(hoyEnMexico(new Date('2026-11-03T03:30:00Z'))).toBe('2026-11-02');
-    expect(hoyEnMexico(new Date('2026-11-03T06:30:00Z'))).toBe('2026-11-03');
-    expect(hoyEnMexico(new Date('2027-01-05T12:00:00Z'))).toBe('2027-01-05');
-  });
-});
-
 describe('interpretarRespuestaVendedor', () => {
   it('texto normal: sin FIN', () => {
     expect(interpretarRespuestaVendedor('  Todo bien  ')).toEqual({ mensaje: 'Todo bien', fin: false });
@@ -214,6 +250,13 @@ describe('interpretarRespuestaVendedor', () => {
   });
   it('solo FIN: mensaje vacío', () => {
     expect(interpretarRespuestaVendedor('FIN\n')).toEqual({ mensaje: '', fin: true });
+  });
+  it('FIN con puntuación o markdown al final también cuenta', () => {
+    expect(interpretarRespuestaVendedor('Gracias, nos vemos. FIN.')).toEqual({ mensaje: 'Gracias, nos vemos.', fin: true });
+    expect(interpretarRespuestaVendedor('¡Gracias! FIN!')).toEqual({ mensaje: '¡Gracias!', fin: true });
+    expect(interpretarRespuestaVendedor('Hasta luego.\n\n**FIN**')).toEqual({ mensaje: 'Hasta luego.', fin: true });
+    expect(interpretarRespuestaVendedor('*FIN*')).toEqual({ mensaje: '', fin: true });
+    expect(interpretarRespuestaVendedor('Listo.FIN')).toEqual({ mensaje: 'Listo.', fin: true });
   });
   it('FIN en medio de una palabra o del texto no cuenta', () => {
     expect(interpretarRespuestaVendedor('FINALMENTE sí')).toEqual({ mensaje: 'FINALMENTE sí', fin: false });

@@ -29,6 +29,7 @@ export interface OpcionesTurno {
 // contra max_tokens: con 1024 casi todas las respuestas se cortaban antes de terminar las herramientas.
 const MAX_TOKENS = 8192;
 const TOPE_HERRAMIENTAS = 8;      // ejecuciones de herramientas por mensaje del vendedor
+const REINTENTOS_CORTE = 1;       // reintentos por turno tras una respuesta cortada sin herramientas completas
 const TOPE_TURNOS = 40;           // mensajes del vendedor por sesión
 const MAX_MENSAJE = 4000;         // caracteres por mensaje del vendedor
 
@@ -115,6 +116,7 @@ async function conversar(
   const respuestas: string[] = [];
   let ejecutadas = 0;
   let llamadas = 0;
+  let reintentos = 0;
 
   for (;;) {
     const final = ejecutadas >= TOPE_HERRAMIENTAS;
@@ -137,20 +139,23 @@ async function conversar(
     depurarLlamada(llamadas, final, msg);
 
     const contenido = Array.isArray(msg.content) ? msg.content : [];
-    // Con max_tokens, el último bloque quedó cortado: si es un tool_use, su input puede estar incompleto y no se
-    // ejecuta. Los tool_use anteriores están completos y se ejecutan para que el modelo pueda continuar.
+    // Con max_tokens, el último bloque quedó cortado (tool_use con input incompleto, texto a medias o thinking):
+    // no se ejecuta, no se muestra y no se guarda. Los tool_use anteriores están completos y se ejecutan para que
+    // el modelo pueda continuar; si no hay ninguno, se reintenta una vez por turno con el aviso de corte.
     const truncada = msg.stop_reason === 'max_tokens';
     const cortado = truncada ? contenido[contenido.length - 1] : undefined;
     const usos = contenido.filter(
       (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use' && b !== cortado,
     );
     const continuar = !final && (msg.stop_reason === 'tool_use' || truncada) && usos.length > 0;
+    const reintentar = truncada && !continuar && reintentos < REINTENTOS_CORTE;
 
     // Se guardan, en su orden: los bloques thinking sin cambios (la API exige devolverlos en el ciclo de
     // herramientas; al terminar el turno se quitan), el texto no vacío y los tool_use que se van a ejecutar
     // (R12: nunca un tool_use sin su resultado).
     const guardar: ContentBlockParam[] = [];
     for (const b of contenido) {
+      if (b === cortado) continue;
       if (b.type === 'thinking' || b.type === 'redacted_thinking') {
         guardar.push({ ...b } as ContentBlockParam);
       } else if (b.type === 'text' && b.text.trim() !== '') {
@@ -163,6 +168,11 @@ async function conversar(
     // Un mensaje con solo thinking no se guarda: no aporta nada y el respaldo ocupa su lugar.
     if (guardar.some((b) => b.type !== 'thinking' && b.type !== 'redacted_thinking')) {
       historial.push({ role: 'assistant', content: guardar });
+    }
+    if (reintentar) {
+      reintentos += 1;
+      agregarUsuario(historial, [{ type: 'text', text: AVISO_CORTE }]);
+      continue;
     }
     if (!continuar) break;
 

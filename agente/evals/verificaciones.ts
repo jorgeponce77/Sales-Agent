@@ -63,8 +63,9 @@ function idioma(esc: Escenario, op: Oportunidad): Verificacion {
 }
 
 function sinPersonasInventadas(esc: Escenario, op: Oportunidad): Verificacion {
-  const hechos = normalizar(esc.hechosOcultos);
-  const inventadas = op.expediente.influencias.map((i) => i.nombre).filter((n) => !hechos.includes(normalizar(n)));
+  // Con espacios alrededor, la comparación es por palabras completas: "Ana" no coincide con "semana".
+  const hechos = ` ${normalizar(esc.hechosOcultos)} `;
+  const inventadas = op.expediente.influencias.map((i) => i.nombre).filter((n) => !hechos.includes(` ${normalizar(n)} `));
   return inventadas.length === 0
     ? { nombre: 'sin_personas_inventadas', ok: true, detalle: 'Todas las personas registradas aparecen en los hechos.' }
     : { nombre: 'sin_personas_inventadas', ok: false, detalle: `Personas que no están en los hechos: ${inventadas.join(', ')}.` };

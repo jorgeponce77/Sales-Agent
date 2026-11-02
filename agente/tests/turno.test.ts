@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MODELO_DEFAULT } from '../src/conversacion/cliente.js';
 import { formatearTranscripcion } from '../src/conversacion/transcripcion.js';
 import { ejecutarTurno, iniciarSesion } from '../src/conversacion/turno.js';
@@ -459,23 +459,17 @@ describe('fix ronda 1', () => {
     esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
   });
 
-  it('tool_use_en_respuesta_que_no_paro_por_herramienta_se_descarta (R12)', async () => {
+  it('tool_use_cortado_no_se_ejecuta_ni_se_guarda (R12)', async () => {
     const truncada = usarHerramientas([{ name: 'registrar_dato', input: BUDGET }], 'Parcial.');
     truncada.stop_reason = 'max_tokens';
-    const cliente = crearClienteFalso([truncada]);
+    const cliente = crearClienteFalso([truncada, texto('¿Me confirmas el monto?')]);
     const r = await ejecutarTurno(opNueva(), 'presupuesto', { cliente, hoy: HOY });
-    expect(cliente.llamadas).toHaveLength(1);
+    expect(cliente.llamadas).toHaveLength(2);
     expect(r.oportunidad.expediente.bant.budget.nivel).toBe('ausente');
-    expect(r.respuestas).toEqual(['Parcial.']);
+    expect(r.respuestas).toEqual(['Parcial.', '¿Me confirmas el monto?']);
     const historial = r.oportunidad.sesionActual?.historial ?? [];
     esperarHistorialValido(historial);
     expect(JSON.stringify(historial)).not.toContain('tool_use');
-
-    const soloHerramienta = usarHerramienta('registrar_dato', BUDGET);
-    soloHerramienta.stop_reason = 'max_tokens';
-    const r2 = await ejecutarTurno(opNueva(), 'presupuesto', { cliente: crearClienteFalso([soloHerramienta]), hoy: HOY });
-    expect(r2.respuestas).toEqual([FALLBACK]);
-    esperarHistorialValido(r2.oportunidad.sesionActual?.historial ?? []);
   });
 
   // Forma observada con claude-sonnet-5-5 (thinking adaptativo por defecto, display omitido) en la corrida de
@@ -513,14 +507,70 @@ describe('fix ronda 1', () => {
     esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
   });
 
-  it('respuesta_truncada_solo_con_thinking_da_respaldo_y_no_guarda_el_thinking', async () => {
-    const cliente = crearClienteFalso([respuestaTruncada([])]);
+  it('respuesta_truncada_solo_con_thinking_reintenta_una_vez_con_aviso', async () => {
+    const cliente = crearClienteFalso([respuestaTruncada([]), texto('¿Quién aprueba el presupuesto?')]);
     const r = await ejecutarTurno(opNueva(), 'Te cuento todo', { cliente, hoy: HOY });
-    expect(cliente.llamadas).toHaveLength(1);
-    expect(r.respuestas).toEqual([FALLBACK]);
+    expect(cliente.llamadas).toHaveLength(2);
+    expect(r.respuestas).toEqual(['¿Quién aprueba el presupuesto?']);
+    const reintento = cliente.llamadas[1]?.messages as MensajeApi[];
+    expect(reintento.at(-1)?.role).toBe('user');
+    expect(bloques(reintento.at(-1)).at(-1)?.text).toBe(AVISO_CORTE);
     const historial = r.oportunidad.sesionActual?.historial ?? [];
     esperarHistorialValido(historial);
     expect(JSON.stringify(historial)).not.toContain('thinking');
+  });
+
+  it('truncada_dos_veces_sin_nada_completo_da_respaldo_sin_tercer_intento', async () => {
+    const cliente = crearClienteFalso([respuestaTruncada([]), respuestaTruncada([]), texto('no debería usarse')]);
+    const r = await ejecutarTurno(opNueva(), 'Te cuento todo', { cliente, hoy: HOY });
+    expect(cliente.llamadas).toHaveLength(2);
+    expect(r.respuestas).toEqual([FALLBACK]);
+    esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  it('truncada_con_thinking_texto_y_tool_use_cortado_guarda_lo_valido_y_reintenta', async () => {
+    const cliente = crearClienteFalso([
+      respuestaTruncada([
+        { type: 'text', text: 'Te escucho.' },
+        { type: 'tool_use', id: 'toolu_c1', name: 'registrar_dato', input: { campo: 'bant.budget' } },
+      ]),
+      texto('¿Quién firma el contrato?'),
+    ]);
+    const r = await ejecutarTurno(opNueva(), 'El CFO aprobó 300 mil', { cliente, hoy: HOY });
+    expect(cliente.llamadas).toHaveLength(2);
+    expect(r.oportunidad.expediente.bant.budget.nivel).toBe('ausente');
+    expect(r.respuestas).toEqual(['Te escucho.', '¿Quién firma el contrato?']);
+    const reintento = cliente.llamadas[1]?.messages as MensajeApi[];
+    expect(bloques(reintento.at(-2))).toEqual([THINKING, { type: 'text', text: 'Te escucho.' }]);
+    expect(bloques(reintento.at(-1)).map((b) => b.text)).toEqual([AVISO_CORTE]);
+    const historial = r.oportunidad.sesionActual?.historial ?? [];
+    esperarHistorialValido(historial);
+    expect(JSON.stringify(historial)).not.toContain('toolu_c1');
+  });
+
+  it('texto_cortado_no_se_muestra_y_se_reintenta', async () => {
+    const cliente = crearClienteFalso([
+      respuestaTruncada([{ type: 'text', text: 'Mira, lo que más me preocupa es que el comi' }]),
+      texto('¿Cuándo decide el comité?'),
+    ]);
+    const r = await ejecutarTurno(opNueva(), 'Te cuento todo', { cliente, hoy: HOY });
+    expect(cliente.llamadas).toHaveLength(2);
+    expect(r.respuestas).toEqual(['¿Cuándo decide el comité?']);
+    expect(r.oportunidad.sesionActual?.transcripcion.map((m) => m.texto)).not.toContain(
+      'Mira, lo que más me preocupa es que el comi',
+    );
+    esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
+  });
+
+  it('el_reintento_por_corte_es_uno_por_turno_y_se_renueva_en_el_siguiente', async () => {
+    const cliente = crearClienteFalso([
+      respuestaTruncada([]), texto('Uno.'),
+      respuestaTruncada([]), texto('Dos.'),
+    ]);
+    const a = await ejecutarTurno(opNueva(), 'primero', { cliente, hoy: HOY });
+    const b = await ejecutarTurno(a.oportunidad, 'segundo', { cliente, hoy: HOY });
+    expect(a.respuestas).toEqual(['Uno.']);
+    expect(b.respuestas).toEqual(['Dos.']);
   });
 
   it('thinking_se_devuelve_sin_cambios_en_el_ciclo_de_herramientas', async () => {
@@ -608,5 +658,38 @@ describe('API pública', () => {
     expect(api.TIPOS_CAMBIO_DEFAULT).toEqual({ USD: 1 });
     // Crear el cliente real no llama a la API.
     expect(typeof api.crearClienteAnthropic('clave-de-prueba').crear).toBe('function');
+  });
+});
+
+describe('depuración (DEBUG_AGENTE=1)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env['DEBUG_AGENTE'];
+  });
+
+  it('escribe metadatos a stderr sin el texto de los mensajes', async () => {
+    const MARCA = 'MARCA-SECRETA-7731';
+    const escrito: string[] = [];
+    vi.spyOn(process.stderr, 'write').mockImplementation((t: string | Uint8Array) => {
+      escrito.push(String(t));
+      return true;
+    });
+    process.env['DEBUG_AGENTE'] = '1';
+    const cliente = crearClienteFalso([
+      usarHerramientas([{ name: 'registrar_dato', input: { ...BUDGET, valor: MARCA } }], `Pensando ${MARCA}`),
+      texto(`Anotado ${MARCA}.`),
+    ]);
+    await ejecutarTurno(opNueva(), `Mensaje con ${MARCA}`, { cliente, hoy: HOY });
+    const salida = escrito.join('');
+    expect(salida).toContain('[agente] llamada');
+    expect(salida).toContain('tool_use:registrar_dato');
+    expect(salida).toContain('fin de turno');
+    expect(salida).not.toContain(MARCA);
+  });
+
+  it('sin DEBUG_AGENTE no escribe nada', async () => {
+    const espia = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    await ejecutarTurno(opNueva(), 'hola', { cliente: crearClienteFalso([texto('Hola.')]), hoy: HOY });
+    expect(espia).not.toHaveBeenCalled();
   });
 });

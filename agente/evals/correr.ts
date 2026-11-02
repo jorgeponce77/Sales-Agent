@@ -8,10 +8,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  crearClienteAnthropic, crearOportunidad, ejecutarTurno, ESCENARIOS, iniciarSesion, MODELO_DEFAULT,
+  crearClienteAnthropic, crearOportunidad, ejecutarTurno, ESCENARIOS, hoyEnMexico, iniciarSesion, MODELO_DEFAULT,
 } from '../src/index.js';
 import type { ClienteModelo, Escenario, Mensaje, Oportunidad, OpcionesTurno, ResultadoTurno, Uso } from '../src/index.js';
-import { hoyEnMexico, interpretarRespuestaVendedor, responderComoVendedor } from './vendedorSimulado.js';
+import { interpretarRespuestaVendedor, responderComoVendedor } from './vendedorSimulado.js';
 import { verificar } from './verificaciones.js';
 import type { Verificacion } from './verificaciones.js';
 
@@ -20,11 +20,12 @@ const MODELO_VENDEDOR_DEFAULT = 'claude-haiku-5-5';
 const TURNOS_DEFAULT = 15;
 
 /**
- * USD por millón de tokens { entrada, salida } por modelo. Los precios son aproximados y hay que verificarlos
- * en la documentación oficial antes de llenar esta tabla; un modelo sin precio se reporta solo en tokens.
- * Los tokens de caché se cuentan aparte y no se valoran.
+ * USD por millón de tokens por modelo: entrada, salida, lectura de caché y escritura de caché, cada uno con su
+ * tarifa. Hay que verificarlos en la documentación oficial antes de llenar esta tabla; un modelo sin precio se
+ * reporta solo en tokens.
  */
-const PRECIOS_USD_POR_MTOK: Record<string, { entrada: number; salida: number }> = {};
+interface Precios { entrada: number; salida: number; cacheLectura: number; cacheEscritura: number }
+const PRECIOS_USD_POR_MTOK: Record<string, Precios> = {};
 
 const usoCero = (): Uso => ({ entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0 });
 const sumar = (a: Uso, b: Uso): void => {
@@ -36,8 +37,10 @@ function describirUso(u: Uso, modelo: string): string {
   const tokens = `entrada ${u.entrada} · salida ${u.salida} · caché leída ${u.cacheLectura} · caché escrita ${u.cacheEscritura}`;
   const p = PRECIOS_USD_POR_MTOK[modelo];
   if (p === undefined) return `${tokens} (sin precio configurado para ${modelo}: solo tokens)`;
-  const usd = (u.entrada * p.entrada + u.salida * p.salida) / 1_000_000;
-  return `${tokens} (≈ ${usd.toFixed(3)} USD sin contar caché; precios aproximados)`;
+  const usd =
+    (u.entrada * p.entrada + u.salida * p.salida + u.cacheLectura * p.cacheLectura + u.cacheEscritura * p.cacheEscritura) /
+    1_000_000;
+  return `${tokens} (≈ ${usd.toFixed(3)} USD, caché incluida)`;
 }
 
 interface Argumentos { escenarios: Escenario[]; turnos: number; hoy: string }
@@ -124,6 +127,10 @@ async function correrEscenario(
       } catch (e) {
         const x = e as { name?: unknown; status?: unknown; message?: unknown };
         error = limpiar(`Falló el vendedor simulado: ${String(x.name)} status=${String(x.status)} ${String(x.message)}`);
+        break;
+      }
+      if (respuesta === '') {
+        error = 'El vendedor simulado no respondió (respuesta vacía tras un reintento); el escenario se detuvo.';
         break;
       }
       const { mensaje, fin } = interpretarRespuestaVendedor(respuesta);
