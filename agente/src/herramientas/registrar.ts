@@ -93,11 +93,11 @@ const NOMBRE_TIPO: Record<Tipo, string> = {
 
 /** Error de tipo del valor para el campo, o null si es del tipo esperado. */
 function errorDeValor(tipo: Tipo, valor: unknown, nivel: unknown): string | null {
-  const vacioPermitido = tipo.startsWith('ev') && nivel === 'ausente' && valor === null;
-  if (vacioPermitido) return null;
   switch (tipo) {
     case 'evTexto':
-      return typeof valor === 'string' ? null : 'debe ser texto';
+      if (typeof valor !== 'string') return 'debe ser texto';
+      if (nivel !== 'ausente' && valor.trim() === '') return 'no puede estar vacío si el nivel es confirmado o supuesto';
+      return null;
     case 'evBool':
     case 'bool':
       return typeof valor === 'boolean' ? null : 'debe ser verdadero o falso';
@@ -133,16 +133,23 @@ export const registrarDato: Herramienta = segura('registrar_dato', (estado, inpu
     (esEvidencia ? ` (${String(nivel)}${typeof fuente === 'string' && fuente !== '' ? `, fuente: ${fuente}` : ''})` : '');
 
   return aplicarEscritura(estado, descripcion, (exp) => {
+    const { padre, clave } = destino(exp, campo);
+    if (esEvidencia) {
+      if (nivel === undefined || nivel === null) {
+        throw new Error('nivel: es obligatorio para este campo (confirmado, supuesto o ausente)');
+      }
+      // Un dato "ausente" no lleva contenido: se guarda con valor null, sea cual sea el valor recibido.
+      if (nivel === 'ausente') {
+        padre[clave] = { valor: null, nivel };
+        return;
+      }
+    }
     if (!presente(input, 'valor')) throw new Error('valor: es obligatorio');
     const errorValor = errorDeValor(tipo, valor, nivel);
     if (errorValor !== null) throw new Error(`valor: ${errorValor} (${campo} espera ${NOMBRE_TIPO[tipo]})`);
-    const { padre, clave } = destino(exp, campo);
     if (!esEvidencia) {
       padre[clave] = valor;
       return;
-    }
-    if (nivel === undefined || nivel === null) {
-      throw new Error('nivel: es obligatorio para este campo (confirmado, supuesto o ausente)');
     }
     if (fuente !== undefined && fuente !== null && typeof fuente !== 'string') {
       throw new Error('fuente: debe ser texto');

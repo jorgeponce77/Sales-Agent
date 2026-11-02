@@ -92,6 +92,37 @@ describe('registrarDato', () => {
     expect(e.oportunidad.expediente).toEqual(antes);
   });
 
+  it('texto_vacio_no_puede_ser_confirmado_ni_supuesto', () => {
+    const casos: [string, string][] = [
+      ['', 'confirmado'], ['   ', 'confirmado'], ['\n\t', 'confirmado'],
+      ['', 'supuesto'], ['  ', 'supuesto'],
+    ];
+    for (const campo of ['bant.budget', 'compellingEvent.dueno', 'prioridad']) {
+      for (const [valor, nivel] of casos) {
+        const e = estadoBase();
+        const antes = structuredClone(e.oportunidad.expediente);
+        const r = registrarDato(e, { campo, valor, nivel, fuente: 'CFO' });
+        expect(r.ok, `${campo} ${JSON.stringify(valor)} ${nivel}`).toBe(false);
+        expect(errores(r).join(' ')).toContain('vacío');
+        expect(e.oportunidad.expediente).toEqual(antes);
+        expect(e.eventos.map((x) => x.tipo)).toEqual(['rechazo']);
+      }
+    }
+  });
+
+  it('ausente_guarda_valor_null', () => {
+    const e = estadoBase();
+    registrarDato(e, { campo: 'bant.budget', valor: 'USD 500k', nivel: 'confirmado', fuente: 'CFO' });
+    expect(registrarDato(e, { campo: 'bant.budget', valor: 'lo que sea', nivel: 'ausente', fuente: 'CFO' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.bant.budget).toEqual({ valor: null, nivel: 'ausente' });
+    expect(registrarDato(e, { campo: 'reorganizacion', valor: true, nivel: 'ausente' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.reorganizacion).toEqual({ valor: null, nivel: 'ausente' });
+    expect(registrarDato(e, { campo: 'cuenta.clienteIdeal.2', valor: 4, nivel: 'ausente' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.cuenta.clienteIdeal[2]).toEqual({ valor: null, nivel: 'ausente' });
+    expect(registrarDato(e, { campo: 'prioridad', valor: '', nivel: 'ausente' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.prioridad).toEqual({ valor: null, nivel: 'ausente' });
+  });
+
   it('booleanos_ignoran_nivel_y_fuente', () => {
     const e = estadoBase();
     const r = registrarDato(e, { campo: 'esRFP', valor: true, nivel: 'confirmado', fuente: 'x' });
