@@ -19,6 +19,7 @@ const TIPO_ALTERNATIVA = ['proveedor', 'interna', 'presupuesto', 'no_hacer_nada'
 const RUTA = ['contrato', 'oc', 'ambas_oc_tras_contrato', 'ambas_independientes', 'desconocida'];
 const ESTADO_ACCION = ['cumplida', 'no_cumplida'];
 const CAMPOS_FICHA = ['etapaCRM', 'fechaCierreCRM', 'tcv', 'moneda'];
+const CLAVES_CRITERIOS = CONFIG_DEFAULT.criteriosArgano.map((c) => c.clave);
 
 const SIN_PARAMETROS = { type: 'object' as const, properties: {} };
 
@@ -56,15 +57,34 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
   {
     name: 'registrar_criterio_argano',
     description:
-      'Registra el nivel de cumplimiento de un criterio de Argano; reemplaza el nivel anterior, no acumula. ' +
-      'Úsala cuando el vendedor confirme, suponga o desconozca si el criterio se cumple.',
+      'Registra el nivel de cumplimiento de criterios de Argano; cada clave reemplaza su nivel anterior, no acumula. ' +
+      'Úsala cuando el vendedor confirme, suponga o desconozca si un criterio se cumple. Dos formas: un criterio {clave, nivel, fuente?} ' +
+      'o un lote {criterios: [{clave, nivel, fuente?}, ...]} de 1 a 30 (registra los criterios de una etapa en una sola llamada). ' +
+      'El lote es atómico: si un elemento es inválido no se registra ninguno y vuelven todos los errores. ' +
+      'Los criterios internos de Argano/Netlogistik con nivel "confirmado" exigen fuente con la referencia verificable del vendedor ' +
+      '("vendedor: <quién lo aprobó / número de PR / fecha>"); sin referencia, regístralos como "supuesto".',
     input_schema: {
       type: 'object',
       properties: {
-        clave: { type: 'string', enum: CONFIG_DEFAULT.criteriosArgano.map((c) => c.clave), description: 'Criterio de Argano.' },
-        nivel: { type: 'string', enum: NIVEL },
+        clave: { type: 'string', enum: CLAVES_CRITERIOS, description: 'Criterio de Argano (forma individual).' },
+        nivel: { type: 'string', enum: NIVEL, description: 'Nivel de cumplimiento (forma individual).' },
+        fuente: { type: 'string', maxLength: 200, description: 'Quién lo confirmó o la referencia verificable (forma individual, opcional).' },
+        criterios: {
+          type: 'array',
+          minItems: 1,
+          maxItems: 30,
+          description: 'Lote de criterios (en lugar de clave/nivel/fuente).',
+          items: {
+            type: 'object',
+            properties: {
+              clave: { type: 'string', enum: CLAVES_CRITERIOS },
+              nivel: { type: 'string', enum: NIVEL },
+              fuente: { type: 'string', maxLength: 200 },
+            },
+            required: ['clave', 'nivel'],
+          },
+        },
       },
-      required: ['clave', 'nivel'],
     },
   },
   {

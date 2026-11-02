@@ -82,6 +82,7 @@ describe('construirInstrucciones', () => {
     expect(fijo).not.toContain('Logisoft');
     expect(fijo).toContain('Excepción para hechos internos de Argano o Netlogistik');
     expect(fijo).toContain('fuente: "vendedor: <referencia>"');
+    expect(fijo).toContain('registra los criterios de una etapa en una sola llamada con `criterios: [...]`');
     const claves = CONFIG_DEFAULT.criteriosArgano.map((c) => c.clave);
     for (const clave of CRITERIOS_INTERNOS) {
       expect(claves).toContain(clave);
@@ -90,7 +91,7 @@ describe('construirInstrucciones', () => {
   });
 
   it('version', () => {
-    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.1');
+    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.2');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
   });
 });

@@ -10,6 +10,7 @@ import {
   registrarInfluencia,
 } from '../src/herramientas/registrar.js';
 import { aplicarEscritura } from '../src/herramientas/escritura.js';
+import { CRITERIOS_INTERNOS } from '../src/instrucciones/base.js';
 import { estadoBase } from './fabrica.js';
 
 const errores = (r: { ok: boolean; errores?: string[] }): string[] => (r.ok ? [] : (r.errores ?? []));
@@ -185,7 +186,9 @@ describe('registrarDato', () => {
 });
 
 describe('registrarCriterioArgano', () => {
-  const clave = CONFIG_DEFAULT.criteriosArgano[0]?.clave as string;
+  // Criterio que confirma el cliente (no interno): `confirmado` no exige fuente.
+  const clave = CONFIG_DEFAULT.criteriosArgano.find((c) => !CRITERIOS_INTERNOS.includes(c.clave))?.clave as string;
+  const interno = CRITERIOS_INTERNOS[0] as string;
 
   it('criterio_reemplaza_no_duplica', () => {
     const e = estadoBase();
@@ -205,6 +208,98 @@ describe('registrarCriterioArgano', () => {
   it('criterio_nivel_invalido', () => {
     const e = estadoBase();
     expect(registrarCriterioArgano(e, { clave, nivel: 'quizás' }).ok).toBe(false);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+  });
+
+  it('criterio_lote_registra_todos_y_reemplaza_por_clave (R6)', () => {
+    const e = estadoBase();
+    expect(registrarCriterioArgano(e, { clave: 'cliente_confirma_real', nivel: 'supuesto' }).ok).toBe(true);
+    const r = registrarCriterioArgano(e, {
+      criterios: [
+        { clave: 'cliente_confirma_real', nivel: 'confirmado', fuente: 'Laura (CFO)' },
+        { clave: 'entiende_cliente_dolores', nivel: 'supuesto' },
+        { clave: 'business_case_identificado', nivel: 'ausente' },
+      ],
+    });
+    expect(r.ok).toBe(true);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([
+      { clave: 'cliente_confirma_real', nivel: 'confirmado', fuente: 'Laura (CFO)' },
+      { clave: 'entiende_cliente_dolores', nivel: 'supuesto' },
+      { clave: 'business_case_identificado', nivel: 'ausente' },
+    ]);
+    const ultimo = e.eventos[e.eventos.length - 1];
+    expect(ultimo?.tipo).toBe('dato');
+    expect(ultimo?.descripcion).toContain('entiende_cliente_dolores');
+    expect(ultimo?.descripcion).toContain('fuente: Laura (CFO)');
+  });
+
+  it('criterio_lote_atomico: un elemento inválido no escribe nada y devuelve todos los errores (R6)', () => {
+    const e = estadoBase();
+    const r = registrarCriterioArgano(e, {
+      criterios: [
+        { clave: 'cliente_confirma_real', nivel: 'confirmado' },
+        { clave: 'no_existe', nivel: 'confirmado' },
+        { clave: 'entiende_cliente_dolores', nivel: 'quizás' },
+      ],
+    });
+    expect(r.ok).toBe(false);
+    const errs = errores(r);
+    expect(errs.some((x) => x.includes('criterios[1]') && x.includes('no_existe'))).toBe(true);
+    expect(errs.some((x) => x.includes('criterios[2]') && x.includes('nivel'))).toBe(true);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+    expect(e.eventos[e.eventos.length - 1]?.tipo).toBe('rechazo');
+  });
+
+  it('criterio_lote_tamano: de 1 a 30 elementos (R6)', () => {
+    const e = estadoBase();
+    expect(registrarCriterioArgano(e, { criterios: [] }).ok).toBe(false);
+    const muchos = Array.from({ length: 31 }, () => ({ clave, nivel: 'supuesto' }));
+    expect(registrarCriterioArgano(e, { criterios: muchos }).ok).toBe(false);
+    expect(registrarCriterioArgano(e, { criterios: 'x' }).ok).toBe(false);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+    const treinta = Array.from({ length: 30 }, () => ({ clave, nivel: 'supuesto' }));
+    expect(registrarCriterioArgano(e, { criterios: treinta }).ok).toBe(true);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([{ clave, nivel: 'supuesto' }]);
+  });
+
+  it('criterio_forma_individual_y_lote_a_la_vez_se_rechaza (R6)', () => {
+    const e = estadoBase();
+    const r = registrarCriterioArgano(e, { clave, nivel: 'supuesto', criterios: [{ clave, nivel: 'supuesto' }] });
+    expect(r.ok).toBe(false);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+  });
+
+  it('criterio_interno_confirmado_exige_fuente (R9)', () => {
+    const e = estadoBase();
+    for (const fuente of [undefined, '', '   ']) {
+      const r = registrarCriterioArgano(e, { clave: interno, nivel: 'confirmado', ...(fuente === undefined ? {} : { fuente }) });
+      expect(r.ok).toBe(false);
+      expect(errores(r).join(' ')).toContain('supuesto');
+      expect(errores(r).join(' ')).toMatch(/referencia/);
+    }
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+    expect(registrarCriterioArgano(e, { clave: interno, nivel: 'supuesto' }).ok).toBe(true);
+    expect(registrarCriterioArgano(e, { clave: interno, nivel: 'confirmado', fuente: 'vendedor: PR-4411 aprobado' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([
+      { clave: interno, nivel: 'confirmado', fuente: 'vendedor: PR-4411 aprobado' },
+    ]);
+    expect(e.eventos[e.eventos.length - 1]?.descripcion).toContain('fuente: vendedor: PR-4411 aprobado');
+  });
+
+  it('criterio_interno_sin_fuente_en_lote_rechaza_el_lote (R9)', () => {
+    const e = estadoBase();
+    const r = registrarCriterioArgano(e, {
+      criterios: [{ clave, nivel: 'confirmado' }, { clave: interno, nivel: 'confirmado' }],
+    });
+    expect(r.ok).toBe(false);
+    expect(errores(r).join(' ')).toContain('criterios[1]');
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
+  });
+
+  it('criterio_fuente_invalida (R9)', () => {
+    const e = estadoBase();
+    expect(registrarCriterioArgano(e, { clave, nivel: 'confirmado', fuente: 42 }).ok).toBe(false);
+    expect(registrarCriterioArgano(e, { clave, nivel: 'confirmado', fuente: 'x'.repeat(201) }).ok).toBe(false);
     expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
   });
 });

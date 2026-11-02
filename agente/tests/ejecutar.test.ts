@@ -40,6 +40,16 @@ describe('definiciones', () => {
     expect(esquema('registrar_criterio_argano').properties?.['clave']?.enum).toEqual(
       CONFIG_DEFAULT.criteriosArgano.map((c) => c.clave),
     );
+    // R6: forma de lote {criterios: [...]} con los mismos enums, de 1 a 30 elementos.
+    const lote = esquema('registrar_criterio_argano').properties?.['criterios'] as any;
+    expect(lote?.type).toBe('array');
+    expect(lote?.minItems).toBe(1);
+    expect(lote?.maxItems).toBe(30);
+    expect(lote?.items?.properties?.clave?.enum).toEqual(CONFIG_DEFAULT.criteriosArgano.map((c) => c.clave));
+    expect(lote?.items?.properties?.nivel?.enum).toEqual(['confirmado', 'supuesto', 'ausente']);
+    expect(lote?.items?.properties?.fuente?.type).toBe('string');
+    expect(esquema('registrar_criterio_argano').properties?.['fuente']).toBeDefined();
+    expect(esquema('registrar_criterio_argano').required ?? []).toEqual([]);
     const inf = esquema('registrar_influencia').properties ?? {};
     expect(inf['roles']?.items?.enum).toEqual(['E', 'U', 'T', 'C']);
     expect(inf['grado']?.enum).toEqual(['A', 'M', 'B', null]);

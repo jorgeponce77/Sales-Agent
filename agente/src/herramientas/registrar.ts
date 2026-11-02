@@ -1,6 +1,7 @@
 import { CONFIG_DEFAULT } from 'motor-sales-agent';
 import type { Alternativa, Expediente, Influencia } from 'motor-sales-agent';
 import { convertirAUSD, validarFicha } from '../ficha.js';
+import { CRITERIOS_INTERNOS } from '../instrucciones/base.js';
 import type { Ficha } from '../tipos.js';
 import { aplicarEscritura, normalizar, rechazar, segura } from './escritura.js';
 import type { EstadoTurno, Herramienta, ResultadoHerramienta } from './escritura.js';
@@ -144,18 +145,92 @@ export const registrarDato: Herramienta = segura('registrar_dato', (estado, inpu
 // registrarCriterioArgano
 // ---------------------------------------------------------------------------
 
+const NIVELES = ['confirmado', 'supuesto', 'ausente'];
+const MAX_LOTE_CRITERIOS = 30;
+const MAX_FUENTE_CRITERIO = 200;
+
+type CriterioCumplido = Expediente['criteriosArgano'][number];
+
+/** Valida un criterio (forma individual o elemento del lote); devuelve el criterio limpio o sus errores. */
+function validarCriterio(raw: unknown, prefijo: string): { criterio: CriterioCumplido } | { errores: string[] } {
+  if (!esObjeto(raw)) return { errores: [`${prefijo}: se esperaba un objeto {clave, nivel, fuente?}`] };
+  const { clave, nivel, fuente } = raw;
+  const errores: string[] = [];
+  if (typeof clave !== 'string' || !CONFIG_DEFAULT.criteriosArgano.some((c) => c.clave === clave)) {
+    errores.push(`${prefijo}clave: criterio de Argano inexistente: ${String(clave)}`);
+  }
+  if (typeof nivel !== 'string' || !NIVELES.includes(nivel)) {
+    errores.push(`${prefijo}nivel: es obligatorio y debe ser ${NIVELES.join(', ')}`);
+  }
+  if (fuente !== undefined && fuente !== null && typeof fuente !== 'string') {
+    errores.push(`${prefijo}fuente: debe ser texto`);
+  } else if (typeof fuente === 'string' && fuente.trim().length > MAX_FUENTE_CRITERIO) {
+    errores.push(`${prefijo}fuente: máximo ${MAX_FUENTE_CRITERIO} caracteres`);
+  }
+  const fuenteLimpia = typeof fuente === 'string' ? fuente.trim() : '';
+  if (typeof clave === 'string' && CRITERIOS_INTERNOS.includes(clave) && nivel === 'confirmado' && fuenteLimpia === '') {
+    errores.push(
+      `${prefijo}fuente: "${clave}" es un hecho interno de Argano/Netlogistik; para registrarlo como confirmado ` +
+        'pide al vendedor la referencia verificable (quién lo aprobó, número de PR o fecha) y envíala en fuente ' +
+        '("vendedor: <referencia>"); sin referencia, regístralo como supuesto',
+    );
+  }
+  if (errores.length > 0) return { errores };
+  return {
+    criterio: {
+      clave: clave as string,
+      nivel: nivel as CriterioCumplido['nivel'],
+      ...(fuenteLimpia !== '' ? { fuente: fuenteLimpia } : {}),
+    },
+  };
+}
+
+const describirCriterio = (c: CriterioCumplido): string =>
+  `"${c.clave}": ${c.nivel}${c.fuente ? ` (fuente: ${c.fuente})` : ''}`;
+
+/**
+ * Forma individual `{clave, nivel, fuente?}` o lote `{criterios: [...]}` (1 a 30).
+ * El lote es atómico: si un elemento es inválido no se escribe nada y vuelven todos los errores.
+ * Cada clave reemplaza su nivel anterior (no acumula).
+ */
 export const registrarCriterioArgano: Herramienta = segura('registrar_criterio_argano', (estado, input) => {
   if (!esObjeto(input)) return entradaInvalida(estado, 'registrar_criterio_argano');
-  const { clave, nivel } = input;
-  if (typeof clave !== 'string' || !CONFIG_DEFAULT.criteriosArgano.some((c) => c.clave === clave)) {
-    return rechazar(estado, 'criterio de Argano', [`clave: criterio de Argano inexistente: ${String(clave)}`]);
+  const esLote = presente(input, 'criterios');
+  if (esLote && (presente(input, 'clave') || presente(input, 'nivel'))) {
+    return rechazar(estado, 'criterios de Argano', [
+      'entrada: usa la forma individual {clave, nivel, fuente?} o el lote {criterios: [...]}, no ambas',
+    ]);
   }
-  return aplicarEscritura(estado, `Criterio de Argano "${clave}": ${String(nivel)}`, (exp) => {
-    if (nivel === undefined || nivel === null) throw new Error('nivel: es obligatorio (confirmado, supuesto o ausente)');
-    const nuevo = { clave, nivel } as Expediente['criteriosArgano'][number];
-    const i = exp.criteriosArgano.findIndex((c) => c.clave === clave);
-    if (i >= 0) exp.criteriosArgano[i] = nuevo;
-    else exp.criteriosArgano.push(nuevo);
+
+  let crudos: unknown[];
+  if (esLote) {
+    const lista = input['criterios'];
+    if (!Array.isArray(lista) || lista.length < 1 || lista.length > MAX_LOTE_CRITERIOS) {
+      return rechazar(estado, 'criterios de Argano', [
+        `criterios: debe ser una lista de 1 a ${MAX_LOTE_CRITERIOS} elementos {clave, nivel, fuente?}`,
+      ]);
+    }
+    crudos = lista;
+  } else {
+    crudos = [input];
+  }
+
+  const criterios: CriterioCumplido[] = [];
+  const errores: string[] = [];
+  crudos.forEach((raw, i) => {
+    const r = validarCriterio(raw, esLote ? `criterios[${i}].` : '');
+    if ('errores' in r) errores.push(...r.errores);
+    else criterios.push(r.criterio);
+  });
+  if (errores.length > 0) return rechazar(estado, esLote ? 'criterios de Argano' : 'criterio de Argano', errores);
+  const descripcion = `${esLote ? 'Criterios de Argano' : 'Criterio de Argano'}: ${criterios.map(describirCriterio).join('; ')}`;
+
+  return aplicarEscritura(estado, descripcion, (exp) => {
+    for (const nuevo of criterios) {
+      const i = exp.criteriosArgano.findIndex((c) => c.clave === nuevo.clave);
+      if (i >= 0) exp.criteriosArgano[i] = nuevo;
+      else exp.criteriosArgano.push(nuevo);
+    }
   });
 });
 

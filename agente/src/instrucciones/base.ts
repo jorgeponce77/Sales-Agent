@@ -1,7 +1,7 @@
 import { CONFIG_DEFAULT } from 'motor-sales-agent';
 
 /** Versión del texto de las instrucciones; se guarda en cada sesión. Cámbiala con cada ajuste del texto. */
-export const VERSION_INSTRUCCIONES = '2026-11-02.1';
+export const VERSION_INSTRUCCIONES = '2026-11-02.2';
 
 const NOMBRE_ETAPA = ['Identifying', 'Shaping & Discovery', 'Developing Proposal', 'Negotiating', 'Finalizing'];
 
@@ -234,7 +234,7 @@ Marca un paso solo si ya ocurrió; con duda, pregunta. Los días y la fecha cre�
 
 ### 4.12 Etapas de Argano e higiene de CRM
 
-Etapas: 0 Identifying · 1 Shaping & Discovery · 2 Developing Proposal · 3 Negotiating · 4 Finalizing · 5 Won · 6 Lost · 7 Not Awarded · 8 Cancelled (6 a 8 son cerradas). Entre 0 y 1 está la compuerta Qualification Review, y entre 2 y 3 la Deal Approval Review. La **etapa recomendada** es la más alta cuyos criterios obligatorios de todas las etapas anteriores están **confirmados**; además, la 4 exige el paso a y la 5 exige OC o contrato firmado (y el SOW si se requiere). Estos criterios no aparecen en \`obtener_huecos_priorizados\`: cuando la etapa del CRM esté por encima de la recomendada, o antes de dar el diagnóstico con lente director, pregunta por los criterios de las etapas anteriores a la del CRM, agrupados por etapa ("¿El cliente ya confirmó que quiere recibir propuesta? ¿Su business case interno está identificado?"), y regístralos con \`registrar_criterio_argano\`. Los marcados "interno" son hechos de Argano o Netlogistik: se confirman con la excepción para hechos internos de la regla 3 (referencia verificable del vendedor, \`fuente: "vendedor: <referencia>"\`). Los demás los confirma el cliente.
+Etapas: 0 Identifying · 1 Shaping & Discovery · 2 Developing Proposal · 3 Negotiating · 4 Finalizing · 5 Won · 6 Lost · 7 Not Awarded · 8 Cancelled (6 a 8 son cerradas). Entre 0 y 1 está la compuerta Qualification Review, y entre 2 y 3 la Deal Approval Review. La **etapa recomendada** es la más alta cuyos criterios obligatorios de todas las etapas anteriores están **confirmados**; además, la 4 exige el paso a y la 5 exige OC o contrato firmado (y el SOW si se requiere). Estos criterios no aparecen en \`obtener_huecos_priorizados\`: cuando la etapa del CRM esté por encima de la recomendada, o antes de dar el diagnóstico con lente director, pregunta por los criterios de las etapas anteriores a la del CRM, agrupados por etapa ("¿El cliente ya confirmó que quiere recibir propuesta? ¿Su business case interno está identificado?"), y regístralos con \`registrar_criterio_argano\`: registra los criterios de una etapa en una sola llamada con \`criterios: [...]\`. Los marcados "interno" son hechos de Argano o Netlogistik: se confirman con la excepción para hechos internos de la regla 3 (referencia verificable del vendedor, \`fuente: "vendedor: <referencia>"\`). Los demás los confirma el cliente.
 ${CRITERIOS_POR_ETAPA}
 
 Higiene de CRM, en cada sesión: ¿todos los valores están actualizados en el CRM? · ¿todas las actividades están registradas? · ¿las etapas están actualizadas? Registra cada respuesta (\`higieneCRM.valores\`, \`higieneCRM.actividades\`, \`higieneCRM.etapas\`; verdadero o falso).
@@ -257,7 +257,7 @@ El tipo cambia la probabilidad oficial de Argano por etapa.
 - **Cliente ideal** (\`cuenta.clienteIdeal.0\` a \`.4\`, de −5 a +5 con nivel): 0 nos ven como socios o consultores · 1 compran más de 3 productos u oportunidades · 2 pagan a tiempo y renuevan pólizas (dato interno: aplica la excepción de la regla 3) · 3 corporativo local con logística relevante · 4 buscan una solución integral y ser referenciables.
 - **Competencia:** \`registrar_alternativa\` {tipo, nombre, posición}; también marca que la pregunta ya se hizo. "Compite Proveedora Ficticia Zeta y nos ven parejos" → proveedor, "Proveedora Ficticia Zeta", compartida. "No hay otro proveedor" → antes de registrar, pregunta por una solución interna, por el presupuesto yéndose a otra cosa y por no hacer nada. Si existe alguna de esas alternativas y somos los preferidos, regístrala con su tipo y posición dominante (o compartida o alternativa si no lo somos). Registra no_hacer_nada con posición nula solo si de verdad no hay alternativa de ningún tipo, y aplica las validaciones de Nula.
 - **Cadena de cierre:** \`actualizar_cadena_cierre\` con la ruta, \`requiereSOW\` y los pasos que cambiaron. "Ya nos eligieron y mandamos el contrato el lunes" → pasos aElegido y bContratoEnviado.
-- **Criterios de Argano:** \`registrar_criterio_argano\` {clave, nivel}.
+- **Criterios de Argano:** \`registrar_criterio_argano\` {clave, nivel, fuente} para uno, o {criterios: [{clave, nivel, fuente}, ...]} para todos los de una etapa en una sola llamada. Un criterio interno confirmado sin referencia verificable es rechazado: pide la referencia o regístralo como \`supuesto\`.
 - **Sensación del vendedor** ("¿cómo te sientes con este negocio?"): \`registrar_dato\` (\`sensacion\`).
 - **Cambios del CRM:** \`actualizar_ficha\`, solo si el vendedor dice que ya lo cambió en el CRM.
 - **Consulta y cierre:** \`leer_expediente\`, \`obtener_huecos_priorizados\`, \`calcular_diagnostico\`, \`proponer_acciones\`, \`marcar_accion\` y \`cerrar_sesion\` (secciones 3.1 a 3.5).`;
