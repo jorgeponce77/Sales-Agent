@@ -5,6 +5,8 @@ import type { Ficha, Oportunidad, TiposCambio } from './tipos.js';
 
 const LINEAS = ['WMS', 'TMS', 'PLANEACION_DEMANDA', 'VOICE'];
 
+const TIPOS = ['NN', 'ENxT', 'EN', 'EE'];
+
 const esTextoNoVacio = (x: unknown): x is string => typeof x === 'string' && x.trim() !== '';
 
 /** Errores en español de una ficha de CRM; lista vacía si es válida. Nunca lanza. */
@@ -13,10 +15,15 @@ export function validarFicha(f: unknown): string[] {
   const o = f as Record<string, unknown>;
   const errores: string[] = [];
 
+  if (!esTextoNoVacio(o['idCRM'])) errores.push('idCRM: es obligatorio.');
   if (!esTextoNoVacio(o['cliente'])) errores.push('cliente: es obligatorio.');
   if (!esTextoNoVacio(o['oportunidad'])) errores.push('oportunidad: es obligatoria.');
   if (typeof o['pais'] !== 'string' || !/^[A-Z]{2}$/.test(o['pais'])) {
     errores.push('pais: debe ser un código de 2 letras mayúsculas (por ejemplo, MX).');
+  }
+  const tipo = o['tipo'];
+  if (tipo !== null && (typeof tipo !== 'string' || !TIPOS.includes(tipo))) {
+    errores.push(`tipo: debe ser ${TIPOS.join(', ')} o null.`);
   }
   const lineas = o['lineas'];
   if (!Array.isArray(lineas) || lineas.length < 1) {

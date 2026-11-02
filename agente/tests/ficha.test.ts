@@ -28,6 +28,25 @@ describe('ficha', () => {
     expect(todos).toHaveLength(5);
   });
 
+  it('ficha_exige_id_crm', () => {
+    for (const idCRM of ['', '   ', 5, null, undefined]) {
+      const errores = validarFicha(fichaBase({ idCRM: idCRM as never }));
+      expect(errores, String(idCRM)).toHaveLength(1);
+      expect(errores[0], String(idCRM)).toContain('idCRM');
+    }
+  });
+
+  it('ficha_valida_tipo', () => {
+    for (const tipo of ['NN', 'ENxT', 'EN', 'EE', null]) {
+      expect(validarFicha(fichaBase({ tipo: tipo as never })), String(tipo)).toEqual([]);
+    }
+    for (const tipo of ['XX', 'nn', 5, undefined]) {
+      const errores = validarFicha(fichaBase({ tipo: tipo as never }));
+      expect(errores, String(tipo)).toHaveLength(1);
+      expect(errores[0], String(tipo)).toContain('tipo');
+    }
+  });
+
   it('convertir_sin_tipo_de_cambio', () => {
     expect(convertirAUSD(100, 'MXN', { USD: 1 })).toBeNull();
     expect(convertirAUSD(100, 'MXN', { USD: 1, MXN: 0.05 })).toBe(5);
