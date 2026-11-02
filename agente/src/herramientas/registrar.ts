@@ -2,7 +2,7 @@ import { CONFIG_DEFAULT } from 'motor-sales-agent';
 import type { Alternativa, Expediente, Influencia } from 'motor-sales-agent';
 import { convertirAUSD, validarFicha } from '../ficha.js';
 import type { Ficha } from '../tipos.js';
-import { aplicarEscritura, rechazar, segura } from './escritura.js';
+import { aplicarEscritura, normalizar, rechazar, segura } from './escritura.js';
 import type { EstadoTurno, Herramienta, ResultadoHerramienta } from './escritura.js';
 
 type Obj = Record<string, unknown>;
@@ -10,11 +10,6 @@ type Obj = Record<string, unknown>;
 const esObjeto = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const esTexto = (x: unknown): x is string => typeof x === 'string' && x.trim() !== '';
 const presente = (o: Obj, k: string): boolean => o[k] !== undefined;
-
-/** Minúsculas, sin acentos y con espacios colapsados. */
-function normalizar(s: string): string {
-  return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim().replace(/\s+/g, ' ');
-}
 
 /** Entrada que no es un objeto: rechazo con evento. */
 function entradaInvalida(estado: EstadoTurno, nombre: string): ResultadoHerramienta {

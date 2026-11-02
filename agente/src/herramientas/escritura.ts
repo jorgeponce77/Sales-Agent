@@ -70,3 +70,8 @@ export function segura(nombre: string, fn: (estado: EstadoTurno, input: unknown)
     }
   };
 }
+
+/** Minúsculas, sin acentos y con espacios colapsados. */
+export function normalizar(s: string): string {
+  return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim().replace(/\s+/g, ' ');
+}

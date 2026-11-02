@@ -140,6 +140,84 @@ describe('proponer_acciones', () => {
   });
 });
 
+describe('proponer_acciones: duplicados y tope acumulado', () => {
+  type Salida = { aceptadas: unknown[]; rechazadas: { motivo: string }[] };
+  const abiertas = (e: ReturnType<typeof estadoBase>) =>
+    e.oportunidad.expediente.accionesPrevias.filter((a) => a.estado === 'abierta');
+
+  it('el mismo payload dos veces: la segunda llamada es toda ya_abierta', () => {
+    const e = estadoBase();
+    expect(datos<Salida>(proponerAcciones(e, { acciones: [ACCION] })).aceptadas).toHaveLength(1);
+    const d = datos<Salida>(proponerAcciones(e, { acciones: [ACCION] }));
+    expect(d.aceptadas).toEqual([]);
+    expect(d.rechazadas.map((x) => x.motivo)).toEqual(['ya_abierta']);
+    expect(abiertas(e)).toHaveLength(1);
+  });
+
+  it('la comparación ignora mayúsculas, acentos y espacios', () => {
+    const e = estadoBase();
+    proponerAcciones(e, { acciones: [ACCION] });
+    const d = datos<Salida>(
+      proponerAcciones(e, { acciones: [{ ...ACCION, que: '  PEDIR presentación   al economico ' }] }),
+    );
+    expect(d.rechazadas.map((x) => x.motivo)).toEqual(['ya_abierta']);
+  });
+
+  it('una acción cerrada no bloquea volver a proponerla', () => {
+    const e = estadoBase();
+    proponerAcciones(e, { acciones: [ACCION] });
+    marcarAccion(e, { indice: 0, estado: 'no_cumplida' });
+    const d = datos<Salida>(proponerAcciones(e, { acciones: [ACCION] }));
+    expect(d.aceptadas).toHaveLength(1);
+    expect(abiertas(e)).toHaveLength(1);
+  });
+
+  it('duplicado dentro de la misma llamada: una aceptada y una ya_abierta', () => {
+    const e = estadoBase();
+    const d = datos<Salida>(proponerAcciones(e, { acciones: [ACCION, { ...ACCION }] }));
+    expect(d.aceptadas).toHaveLength(1);
+    expect(d.rechazadas.map((x) => x.motivo)).toEqual(['ya_abierta']);
+    expect(abiertas(e)).toHaveLength(1);
+  });
+
+  it('un duplicado inválido no desplaza al válido', () => {
+    const e = estadoBase();
+    const d = datos<Salida>(proponerAcciones(e, { acciones: [{ ...ACCION, quien: '' }, ACCION] }));
+    expect(d.aceptadas).toEqual([ACCION]);
+    expect(d.rechazadas.map((x) => x.motivo)).toEqual(['sin_responsable']);
+  });
+
+  it('con 4 abiertas, 3 nuevas válidas: 1 aceptada y 2 excede_maximo', () => {
+    const e = estadoBase();
+    e.oportunidad.expediente.accionesPrevias = [1, 2, 3, 4].map((n) => ({
+      que: `previa ${n}`, quien: 'Ana', cuando: '2026-11-05', atiende: 'sin_economico', estado: 'abierta' as const,
+    }));
+    const nuevas = [1, 2, 3].map((n) => ({ ...ACCION, que: `nueva ${n}` }));
+    const d = datos<Salida>(proponerAcciones(e, { acciones: nuevas }));
+    expect(d.aceptadas).toHaveLength(1);
+    expect(d.rechazadas.map((x) => x.motivo)).toEqual(['excede_maximo', 'excede_maximo']);
+    expect(abiertas(e)).toHaveLength(5);
+  });
+
+  it('con 5 abiertas no se acepta ninguna; las cerradas no cuentan para el tope', () => {
+    const e = estadoBase();
+    e.oportunidad.expediente.accionesPrevias = [1, 2, 3, 4, 5].map((n) => ({
+      que: `previa ${n}`, quien: 'Ana', cuando: '2026-11-05', atiende: 'sin_economico', estado: 'abierta' as const,
+    }));
+    expect(datos<Salida>(proponerAcciones(e, { acciones: [ACCION] })).rechazadas.map((x) => x.motivo)).toEqual([
+      'excede_maximo',
+    ]);
+    marcarAccion(e, { indice: 0, estado: 'cumplida' });
+    expect(datos<Salida>(proponerAcciones(e, { acciones: [ACCION] })).aceptadas).toHaveLength(1);
+  });
+
+  it('ocho llamadas iguales no acumulan más de una acción', () => {
+    const e = estadoBase();
+    for (let i = 0; i < 8; i++) proponerAcciones(e, { acciones: [ACCION] });
+    expect(e.oportunidad.expediente.accionesPrevias).toHaveLength(1);
+  });
+});
+
 describe('marcar_accion', () => {
   const conAccion = () => {
     const e = estadoBase();

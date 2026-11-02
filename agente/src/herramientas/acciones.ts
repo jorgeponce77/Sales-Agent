@@ -1,6 +1,6 @@
 import { CONFIG_DEFAULT, calcularDiagnostico, validarAcciones } from 'motor-sales-agent';
 import type { AccionPropuesta } from 'motor-sales-agent';
-import { aplicarEscritura, rechazar, segura } from './escritura.js';
+import { aplicarEscritura, normalizar, rechazar, segura } from './escritura.js';
 import type { EstadoTurno, ResultadoHerramienta } from './escritura.js';
 
 type Obj = Record<string, unknown>;
@@ -28,9 +28,48 @@ export const proponerAcciones = segura('proponer_acciones', (estado, input) => {
     else malformadas.push({ accion: p, motivo: 'accion_malformada' });
   }
 
+  const abiertas = estado.oportunidad.expediente.accionesPrevias.filter((a) => a.estado === 'abierta');
+  const clave = (a: { atiende: unknown; que: unknown }): string =>
+    `${typeof a.atiende === 'string' ? normalizar(a.atiende) : ''}|${typeof a.que === 'string' ? normalizar(a.que) : ''}`;
+  const yaAbiertas = new Set(abiertas.map(clave));
+
+  // Una propuesta idéntica (mismo "atiende" y "que" normalizados) a una acción abierta no se repite.
+  const duplicadasDeAbiertas: { accion: AccionPropuesta; motivo: string }[] = [];
+  const nuevas: AccionPropuesta[] = [];
+  for (const p of aValidar) {
+    if (yaAbiertas.has(clave(p))) duplicadasDeAbiertas.push({ accion: p, motivo: 'ya_abierta' });
+    else nuevas.push(p);
+  }
+
+  // El motor valida y ordena por severidad; el tope y los duplicados se aplican después,
+  // para que una propuesta inválida no desplace a una válida.
   const diag = calcularDiagnostico(estado.oportunidad.expediente, estado.hoy);
-  const r = validarAcciones(aValidar, diag.banderas, diag.fortalezas, estado.hoy, CONFIG_DEFAULT);
-  const rechazadas = [...r.rechazadas, ...malformadas];
+  const config = { ...CONFIG_DEFAULT, maxAcciones: Math.max(nuevas.length, 1) };
+  const validadas = validarAcciones(nuevas, diag.banderas, diag.fortalezas, estado.hoy, config);
+
+  const vistas = new Set<string>();
+  const aceptadasUnicas: AccionPropuesta[] = [];
+  const repetidas: { accion: AccionPropuesta; motivo: string }[] = [];
+  for (const a of validadas.aceptadas) {
+    const k = clave(a);
+    if (vistas.has(k)) repetidas.push({ accion: a, motivo: 'ya_abierta' });
+    else {
+      vistas.add(k);
+      aceptadasUnicas.push(a);
+    }
+  }
+
+  // Las abiertas cuentan para el tope: abiertas + nuevas no pueden pasar de maxAcciones.
+  const cupo = Math.max(0, CONFIG_DEFAULT.maxAcciones - abiertas.length);
+  const r = {
+    aceptadas: aceptadasUnicas.slice(0, cupo),
+    rechazadas: [
+      ...validadas.rechazadas,
+      ...repetidas,
+      ...aceptadasUnicas.slice(cupo).map((accion) => ({ accion, motivo: 'excede_maximo' })),
+    ],
+  };
+  const rechazadas = [...r.rechazadas, ...duplicadasDeAbiertas, ...malformadas];
 
   if (r.aceptadas.length > 0) {
     const descripcion =
