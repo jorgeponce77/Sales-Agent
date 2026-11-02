@@ -45,7 +45,7 @@ CADENA DE CIERRE: el cliente no ha elegido proveedor; no hay contrato. No sabes 
 
 CRITERIOS DE ARGANO:
 - Etapa 0 cumplida: lead de una referencia de otro cliente del grupo (fuente creíble); Paredes confirmó que el proyecto es real; alineada con la estrategia (la aprobó tu gerente, Fernando Ríos, hace unos cuatro meses).
-- Etapa 1 cumplida: entiendes al cliente y los dolores (Karina y Paredes); presupuesto aproximado conocido por la partida de unos 300 mil dólares y volumen conocido; revisión de calificación Argano aprobada por Fernando Ríos hace unos tres meses; el business case del cliente es reducir sobrepersonal y multas; Paredes pidió una propuesta "para compararla".
+- Etapa 1 (falta un criterio): entiendes al cliente y los dolores (Karina y Paredes); volumen conocido y presupuesto aproximado conocido (la partida de unos 300 mil dólares); el business case del cliente es reducir sobrepersonal y multas; Paredes pidió una propuesta "para compararla". NO está cumplida la aprobación de presupuesto del lado del cliente: la única partida está asignada al piloto de TI y Paredes quiere la propuesta solo para comparar; la revisión interna de calificación de Argano sí la aprobó Fernando Ríos hace unos tres meses, pero sin presupuesto del cliente el criterio no se cumple.
 - Etapa 2: propuesta desarrollada (versión 1, entregada hace unas seis semanas): sí. Requerimientos refinados: NO, porque TI no ha compartido muestras de datos. Los demás criterios de la etapa no los has trabajado.
 - Etapas 3 y 4: nada.
 
@@ -74,7 +74,7 @@ export const E4: Escenario = {
       vendedor: 'Valeria Quispe Mendoza',
       probabilidadCRM: CONFIG_DEFAULT.probabilidades.NN[2],
       esRFP: false,
-      ultimaActualizacionCRM: sumarDiasNaturales(hoy, -60),
+      ultimaActualizacionCRM: sumarDiasNaturales(hoy, -40),
     };
   },
   tarjetaPapel: TARJETA_PAPEL,

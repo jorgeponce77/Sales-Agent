@@ -128,7 +128,7 @@ describe('escenarios simulados', () => {
   });
 
   it('nombres_de_personas_y_empresas_son_ficticios', () => {
-    const reales = /\b(Walmart|Soriana|Chedraui|Liverpool|Oxxo|Coppel|Bimbo|Cemex|Mercado Libre|SAP|Manhattan|Blue Yonder|Oracle|COFEPRIS|IMSS|PEMEX|CFE|Diconsa|Segalmex)\b/i;
+    const reales = /\b(Infotrack|Aguirre|Walmart|Soriana|Chedraui|Liverpool|Oxxo|Coppel|Bimbo|Cemex|Mercado Libre|SAP|Manhattan|Blue Yonder|Oracle|COFEPRIS|IMSS|PEMEX|CFE|Diconsa|Segalmex)\b/i;
     for (const e of ESCENARIOS) {
       const f = e.construirFicha(HOY);
       expect(`${f.cliente} ${f.oportunidad} ${f.vendedor}`, e.id).not.toMatch(reales);
@@ -189,6 +189,13 @@ describe('escenarios: los hechos permiten llegar a lo que debe detectar el agent
     // Si el vendedor la articula cuando lo presionan, la bandera desaparece.
     exp.contribucionDiferenciadora = { valor: 'Modelo probado con datos de otros 3PL, listo en unos 4 meses', nivel: 'supuesto' };
     expect(calcularDiagnostico(exp, HOY).banderas.map((b) => b.id)).not.toContain('sin_contribucion_diferenciadora');
+  });
+
+  it('E4: sin presupuesto del cliente la etapa 2 está inflada (recomendada 1)', () => {
+    const d = calcularDiagnostico(expedienteDeVerdad('E4', porId('E4').construirFicha(HOY), HOY), HOY);
+    expect(d.etapaRecomendada).toBe(1);
+    expect(d.comparacionEtapa).toBe('inflada');
+    expect(d.banderas.map((b) => b.id)).toContain('etapa_inflada');
   });
 
   it('E5: verde, fortalezas, cadena creíble y sin banderas críticas', () => {

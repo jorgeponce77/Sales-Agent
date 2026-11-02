@@ -5,7 +5,7 @@ import type { Escenario } from './index.js';
 const TARJETA_PAPEL = `Eres Jesús Palacios, ejecutivo de Netlogistik para el sector público en México. Hace un mes saliste a participar en la licitación del Instituto de Abasto y Servicios Anáhuac, una paraestatal, para un WMS en sus 5 almacenes regionales (900 mil dólares).
 Te enteraste del concurso por el portal de compras públicas: Netlogistik no tenía ningún contacto con la entidad antes de que se publicara.
 Solo has hablado una vez, por teléfono, con Aurelio Castañeda, Subgerente de Adquisiciones, que te dijo "todo por el portal". Los nombres de Rosario Villaseñor (Operaciones de Almacenes) y de Salvador Orozco (Administración y Finanzas) los sacaste de las bases; nunca los has visto.
-Sabes que el integrador que les da servicio hoy, Infotrack del Bajío, va a concursar y que las bases piden experiencia en su plataforma actual; del resto de los competidores no sabes nada.
+Sabes que el integrador que les da servicio hoy, Soporte Logístico Quetzal, va a concursar y que las bases piden experiencia en su plataforma actual; del resto de los competidores no sabes nada.
 La junta de aclaraciones es en unos días y tienes las preguntas listas; te urge avanzar porque las propuestas se entregan en unas cinco semanas.
 Tono: apurado. Contestas corto, con prisa, y quieres que el agente vaya al grano.`;
 
@@ -22,7 +22,7 @@ PERSONAS (si el agente pregunta por alguna, responde con estos datos):
 No conoces a nadie técnico ni a ningún posible Coach. Nadie del cliente te conocía antes de la licitación.
 RFP: sí, es un RFP. Contacto previo con las influencias antes de que se publicara: NO, ninguno. La llamada con Castañeda fue después de publicada y no cuenta como contacto previo.
 
-COMPETENCIA: si el agente pregunta directo contra quién compites o qué alternativas hay: el proveedor actual, Infotrack del Bajío, que les da servicio y soporte al WMS que usan hoy, va a concursar y las bases piden experiencia en esa plataforma, así que lo ves como el favorito: tu posición frente a él es de alternativa. Esperas a otros dos o tres integradores, pero no sabes cuáles. No sabes si la entidad considera seguir con lo actual ni desarrollar algo propio. Los criterios de evaluación sí están en las bases: puntos por precio, experiencia y plan de implementación (criterios de compra definidos). Contribución diferenciadora: no la has pensado; si insisten, dices que nuestra experiencia en almacenes de alto volumen y los tiempos de arranque, y que es una suposición tuya.
+COMPETENCIA: si el agente pregunta directo contra quién compites o qué alternativas hay: el proveedor actual, Soporte Logístico Quetzal, que les da servicio y soporte al WMS que usan hoy, va a concursar y las bases piden experiencia en esa plataforma, así que lo ves como el favorito: tu posición frente a él es de alternativa. Esperas a otros dos o tres integradores, pero no sabes cuáles. No sabes si la entidad considera seguir con lo actual ni desarrollar algo propio. Los criterios de evaluación sí están en las bases: puntos por precio, experiencia y plan de implementación (criterios de compra definidos). Contribución diferenciadora: no la has pensado; si insisten, dices que nuestra experiencia en almacenes de alto volumen y los tiempos de arranque, y que es una suposición tuya.
 
 PRIORIDAD: dices que "activa", porque publicaron la licitación. No sabes si la dirección la considera urgente.
 
@@ -38,7 +38,7 @@ CADENA DE CIERRE: el cliente no ha elegido proveedor (es una licitación abierta
 
 CRITERIOS DE ARGANO:
 - Etapa 0 cumplida: fuente creíble (portal oficial de compras públicas); la entidad confirma que el proyecto es real (publicación oficial); alineada con la estrategia (la aprobó tu gerente, Ricardo Olvera, hace unas tres semanas, decisión de ir a concurso).
-- Etapa 1: RFP analizado y preguntas armadas: sí, documento de preguntas v1 revisado por preventa (Ricardo Olvera) hace una semana. Volumen aproximado: sí, está en el anexo técnico (5 almacenes y unas 18 mil posiciones); presupuesto aproximado: sí, suficiencia presupuestal en las bases. Revisión de calificación Argano (go/no-go) aprobada por Ricardo Olvera hace unas tres semanas. Entiende al cliente y sus dolores: NO, solo por las bases. Business case del cliente: NO. El cliente invita formalmente a presentar propuesta: sí.
+- Etapa 1: RFP analizado y preguntas armadas: sí, documento de preguntas v1 revisado por preventa (Marisol Arteaga) hace una semana. Volumen aproximado: sí, está en el anexo técnico (5 almacenes y unas 18 mil posiciones); presupuesto aproximado: sí, suficiencia presupuestal en las bases. Aprobación de presupuesto del lado del cliente: consta en la constancia de suficiencia presupuestal que forma parte de las bases (no la confirmó ninguna persona). Revisión interna de calificación de Argano (go/no-go) aprobada por Ricardo Olvera hace unas tres semanas. Entiende al cliente y sus dolores: NO, solo por las bases. Business case del cliente: NO. El cliente invita formalmente a presentar propuesta: sí.
 - Etapa 2 en adelante: la respuesta al RFP todavía no está elaborada; nada más cumplido.
 
 HIGIENE DEL CRM: "todo al día" (valores sí, actividades sí, etapas sí). Solo hay la llamada con Castañeda y las reuniones internas de preventa.

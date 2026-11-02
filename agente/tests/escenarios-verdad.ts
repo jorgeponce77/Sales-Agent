@@ -108,7 +108,7 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         inf({ personaId: 'salvador-orozco', nombre: 'Salvador Orozco Ibarra', roles: ['E'], grado: 'A' }),
       ];
       exp.preguntaCompetenciaHecha = true;
-      exp.alternativas = [{ tipo: 'proveedor', nombre: 'Infotrack del Bajío', posicion: 'alternativa' }];
+      exp.alternativas = [{ tipo: 'proveedor', nombre: 'Soporte Logístico Quetzal', posicion: 'alternativa' }];
       exp.contribucionDiferenciadora = ev('Experiencia en almacenes de alto volumen', 'supuesto', hace(1));
       exp.bant = {
         budget: ev('Suficiencia presupuestal en las bases', 'confirmado', hace(25)),
@@ -151,7 +151,7 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         urgenciaFalsa: false,
       };
       exp.criteriosArgano = [
-        ...criteriosHasta(2, false),
+        ...criteriosHasta(2, false, ['aprobacion_calificacion_presupuesto_cliente']),
         ...criterios(['propuesta_desarrollada']),
       ];
       exp.higieneCRM = { valores: true, actividades: false, etapas: true };
@@ -164,7 +164,7 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
       exp.criteriosCompraDefinidos = true;
       exp.cuenta.clienteIdeal = [4, 4, 5, 4, 3].map((v) => ev(v, 'confirmado', hace(10)));
       exp.influencias = [
-        inf({ personaId: 'fernando-aguirre', nombre: 'Fernando Aguirre Zubiría', roles: ['E'], grado: 'A', modo: 'P', calificacion: 4,
+        inf({ personaId: 'rodolfo-quiroz', nombre: 'Rodolfo Quiroz Zubiría', roles: ['E'], grado: 'A', modo: 'P', calificacion: 4,
           contactada: true, ultimoContacto: hace(6), trDeclaracion: 'Aprobar la verificación de seguimiento sin observaciones ni multa' }),
         inf({ personaId: 'alejandra-montes', nombre: 'Alejandra Montes Ledesma', roles: ['U', 'C'], grado: 'A', modo: 'P', calificacion: 5,
           contactada: true, ultimoContacto: hace(2), trDeclaracion: 'Surtir sin errores de lote y caducidad sin frenar la operación' }),
@@ -177,15 +177,15 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
       exp.alternativas = [{ tipo: 'proveedor', nombre: 'TalkPick Systems', posicion: 'dominante' }];
       exp.contribucionDiferenciadora = ev('Integración nativa con el WMS instalado y arranque en unas 8 semanas', 'confirmado', hace(21));
       exp.bant = {
-        budget: ev('Partida aprobada en el presupuesto 2026 (correo de Aguirre)', 'confirmado', hace(14)),
-        authority: ev('Aguirre decide; el comité de inversiones ratificó', 'confirmado', hace(21)),
+        budget: ev('Partida aprobada en el presupuesto 2026 (correo de Quiroz)', 'confirmado', hace(14)),
+        authority: ev('Quiroz decide; el comité de inversiones ratificó', 'confirmado', hace(21)),
         need: ev('Observación de la autoridad sanitaria sobre trazabilidad de lote y caducidad', 'confirmado', hace(35)),
         time: ev('Firma pronto para operar antes de la fecha regulatoria', 'confirmado', hace(14)),
       };
       exp.compellingEvent = {
         descripcion: 'Verificación de seguimiento de la autoridad sanitaria en el CD de Toluca',
         fecha: ev(sumarDiasNaturales(hoy, 135), 'confirmado', hace(14)),
-        dueno: ev('Fernando Aguirre', 'confirmado', hace(14)),
+        dueno: ev('Rodolfo Quiroz', 'confirmado', hace(14)),
         costoInaccion: ev('Multa y suspensión de productos controlados (unos 3.5 millones de dólares de ventas al mes)', 'confirmado', hace(14)),
         urgenciaFalsa: false,
       };

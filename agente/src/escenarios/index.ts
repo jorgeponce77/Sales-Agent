@@ -13,7 +13,7 @@ export interface Escenario {
   construirFicha(hoy: string): Ficha;
   /** Tarjeta "Tu papel" para George: de 5 a 8 líneas, en segunda persona. */
   tarjetaPapel: string;
-  /** Los mismos hechos en tercera persona y con más detalle, para el vendedor simulado de las evaluaciones. */
+  /** Los mismos hechos con más detalle, redactados en segunda persona porque son el prompt de actuación del vendedor simulado de las evaluaciones. */
   hechosOcultos: string;
   /** Cómo habla el vendedor simulado. */
   persona: string;
