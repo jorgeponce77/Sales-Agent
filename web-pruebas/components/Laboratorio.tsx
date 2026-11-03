@@ -5,6 +5,8 @@ import type { ModoSesion, Oportunidad, ResultadoTurno, Uso } from 'agente-sales-
 import { crearAlmacen } from '../lib/almacenNavegador';
 import type { Almacen, EstadoAlmacen } from '../lib/almacenNavegador';
 import { etiquetaModo, MODOS_SESION } from '../lib/catalogos';
+import { claveDelTurno, crearAlmacenUso } from '../lib/usoSesion';
+import type { AlmacenUso } from '../lib/usoSesion';
 import Chat from './Chat';
 import type { BloqueConversacion } from './Chat';
 import FichaNueva from './FichaNueva';
@@ -23,6 +25,7 @@ export interface EscenarioVista {
 
 const GENERICO = 'Error interno, intenta de nuevo.';
 const SIN_CONEXION = 'Sin conexión, intenta de nuevo.';
+const LLENO = 'Almacenamiento del navegador lleno: usa Reiniciar en oportunidades viejas.';
 const NUEVA = 'nueva';
 
 type Respuesta = { ok: true; datos: unknown } | { ok: false; mensaje: string };
@@ -99,6 +102,7 @@ function useEscritorio(): boolean {
 
 export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista[] }) {
   const almacen = useRef<Almacen | null>(null);
+  const almacenUso = useRef<AlmacenUso | null>(null);
   const [oportunidades, setOportunidades] = useState<Oportunidad[]>([]);
   const [estadoAlmacen, setEstadoAlmacen] = useState<EstadoAlmacen>('ok');
   const [seleccion, setSeleccion] = useState<string>(`esc:${escenarios[0]?.id ?? ''}`);
@@ -106,7 +110,9 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
   const [ocupado, setOcupado] = useState(false);
   const [pendiente, setPendiente] = useState<string | null>(null);
   const [aviso, setAviso] = useState<Aviso | null>(null);
-  const [uso, setUso] = useState<Uso>({ entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0 });
+  const [usoLleno, setUsoLleno] = useState(false);
+  // Se incrementa al sumar tokens para volver a leer el contador de la sesión.
+  const [, setVersionUso] = useState(0);
   const [panelAbierto, setPanelAbierto] = useState(true);
   const [listo, setListo] = useState(false);
   const [confirmandoNueva, setConfirmandoNueva] = useState(false);
@@ -121,6 +127,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
       storage = null;
     }
     almacen.current = crearAlmacen(storage);
+    almacenUso.current = crearAlmacenUso(storage);
     refrescar();
     setListo(true);
   }, []);
@@ -144,6 +151,16 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
     return e !== undefined ? `esc:${e.id}` : `op:${id}`;
   };
 
+  /** Suma los tokens del turno a la sesión en la que corrió (la abierta después o la que el turno cerró). */
+  function sumarUso(antes: Oportunidad | undefined, res: ResultadoTurno): void {
+    const a = almacenUso.current;
+    const clave = claveDelTurno(antes, res.oportunidad);
+    if (a === null || clave === null) return;
+    a.sumar(clave, res.oportunidad.id, res.uso);
+    setUsoLleno(a.lleno);
+    setVersionUso((v) => v + 1);
+  }
+
   /** Una llamada a /api/turno: guarda la oportunidad que regresa (también en errores) y suma los tokens. */
   async function turno(cuerpo: Record<string, unknown>): Promise<ResultadoTurno | null> {
     setOcupado(true);
@@ -161,12 +178,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
       const res = r.datos;
       almacen.current?.guardar(res.oportunidad);
       refrescar();
-      setUso((u) => ({
-        entrada: u.entrada + res.uso.entrada,
-        salida: u.salida + res.uso.salida,
-        cacheLectura: u.cacheLectura + res.uso.cacheLectura,
-        cacheEscritura: u.cacheEscritura + res.uso.cacheEscritura,
-      }));
+      sumarUso(cuerpo['oportunidad'] as Oportunidad | undefined, res);
       if (res.error !== null) setAviso({ tipo: 'error', texto: res.error });
       return res;
     } finally {
@@ -228,6 +240,8 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
     if (actual === null) return;
     if (!window.confirm('¿Borrar esta oportunidad y su conversación de este navegador?')) return;
     almacen.current?.borrar(actual.id);
+    almacenUso.current?.borrarOportunidad(actual.id);
+    setUsoLleno(almacenUso.current?.lleno ?? false);
     refrescar();
     setAviso(null);
     if (escenario === undefined) setSeleccion(`esc:${escenarios[0]?.id ?? ''}`);
@@ -235,10 +249,14 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
 
   function reiniciarDatos(): void {
     almacen.current?.reiniciar();
+    almacenUso.current?.reiniciar();
+    setUsoLleno(false);
     refrescar();
   }
 
   const sesion = actual?.sesionActual ?? null;
+  // Tokens de la sesión abierta de esta oportunidad (o de su última sesión), guardados en el navegador.
+  const uso: Uso = almacenUso.current?.deOportunidad(actual) ?? { entrada: 0, salida: 0, cacheLectura: 0, cacheEscritura: 0 };
   const bloques: BloqueConversacion[] = actual === null ? [] : [
     ...actual.sesiones.map((s, i) => ({
       clave: `s${i}`,
@@ -271,6 +289,9 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
           <span>Los datos de prueba guardados en este navegador son de otra versión y no se pueden leer.</span>
           <button type="button" className="boton" onClick={reiniciarDatos}>Reiniciar datos de prueba</button>
         </div>
+      )}
+      {(estadoAlmacen === 'lleno' || usoLleno) && (
+        <div className="aviso aviso-error" role="alert">{LLENO}</div>
       )}
       {estadoAlmacen === 'sin_almacen' && (
         <div className="aviso aviso-info" role="status">
@@ -396,7 +417,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
       )}
 
       <footer className="lab-pie">
-        <span>Tokens de esta sesión de la página: <strong>{miles(totalTokens(uso))}</strong></span>
+        <span>Tokens de la sesión de esta oportunidad: <strong>{miles(totalTokens(uso))}</strong></span>
         <span className="suave">
           entrada {miles(uso.entrada)} · salida {miles(uso.salida)} · caché leída {miles(uso.cacheLectura)} · caché escrita {miles(uso.cacheEscritura)}
         </span>

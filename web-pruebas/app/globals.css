@@ -140,6 +140,10 @@ body {
   background: var(--ambar-fondo); color: var(--ambar-texto); border: 1px solid var(--ambar-punto);
 }
 .confirmacion { grid-column: 1 / -1; }
+.panel-aviso {
+  margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; font-size: 0.9rem;
+  background: var(--ambar-fondo); color: var(--ambar-texto); border: 1px solid var(--ambar-punto);
+}
 .confirmacion p { margin: 0; font-weight: 600; }
 .confirmacion .boton { color: var(--texto); }
 .confirmacion .boton-principal { color: var(--acento-texto); }

@@ -64,10 +64,15 @@ export function crearClienteFalso(): ClienteModelo {
   };
 }
 
+// Un turno puede hacer varias llamadas; con 2 reintentos y 120 s por llamada, el presupuesto del turno (240 s,
+// ver /api/turno) y maxDuration (300 s) acotan el total.
+const REINTENTOS_API = 2;
+const TIEMPO_POR_LLAMADA_MS = 120_000;
+
 /** Cliente del modelo para el servidor: el falso con `MODELO_FALSO=1`; si no, el real con `ANTHROPIC_API_KEY`. */
 export function obtenerCliente(): ClienteModelo {
   if (process.env.MODELO_FALSO === '1') return crearClienteFalso();
   const clave = process.env.ANTHROPIC_API_KEY;
   if (!clave) throw new Error('Falta ANTHROPIC_API_KEY en el servidor.');
-  return crearClienteAnthropic(clave);
+  return crearClienteAnthropic(clave, { maxRetries: REINTENTOS_API, timeout: TIEMPO_POR_LLAMADA_MS });
 }

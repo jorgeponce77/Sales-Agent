@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { calcularDiagnostico } from 'motor-sales-agent';
 import { validarOportunidad } from '../lib/validarOportunidad';
 import { oportunidadBase } from './fabrica';
 
@@ -139,6 +140,43 @@ describe('validarOportunidad (R16)', () => {
     mal([{ role: 'user', content: ['x'] }]);
     mal([{ role: 'user', content: [{ type: 'image' }] }]);
     mal([{ role: 'user', content: [{ type: 'server_tool_use' }] }]);
+  });
+
+  it('acepta la foto de una sesión archivada (Importante 3)', () => {
+    const op = base();
+    op.sesiones = [{
+      fecha: '2026-10-30', modo: 'calificar', resumen: 'ok', versionInstrucciones: 'v1', transcripcion: [],
+      foto: { expediente: structuredClone(op.expediente), diagnostico: calcularDiagnostico(op.expediente, '2026-10-30') },
+    }];
+    expect(validarOportunidad(op)).toEqual([]);
+    op.sesiones[0].foto.diagnostico = null;
+    expect(validarOportunidad(op)).toEqual([]);
+  });
+
+  it('rechaza una foto mal formada nombrando el campo (Importante 3)', () => {
+    const conFoto = (foto: unknown): Cualquiera => {
+      const op = base();
+      op.sesiones = [{ fecha: '2026-10-30', modo: 'calificar', resumen: 'ok', transcripcion: [], foto }];
+      return op;
+    };
+    expect(validarOportunidad(conFoto('x')).join(' ')).toMatch(/sesiones\[0\]\.foto/);
+    const expMalo = structuredClone(base().expediente);
+    expMalo.etapaCRM = 'tres';
+    expect(validarOportunidad(conFoto({ expediente: expMalo, diagnostico: null })).join(' ')).toMatch(/sesiones\[0\]\.foto\.expediente/);
+    expect(validarOportunidad(conFoto({ expediente: 'basura', diagnostico: null })).join(' ')).toMatch(/sesiones\[0\]\.foto\.expediente/);
+    const exp = structuredClone(base().expediente);
+    expect(validarOportunidad(conFoto({ expediente: exp, diagnostico: 'rojo' })).join(' ')).toMatch(/sesiones\[0\]\.foto\.diagnostico/);
+    expect(validarOportunidad(conFoto({ expediente: exp, diagnostico: { indice: { semaforo: 1 } } })).join(' ')).toMatch(/foto\.diagnostico/);
+  });
+
+  it('rechaza cerrada que no coincide con la etapa del CRM (Menor 10)', () => {
+    const abierta = base();
+    abierta.cerrada = true;
+    expect(validarOportunidad(abierta).join(' ')).toMatch(/cerrada.*etapa/);
+    const cerrada = structuredClone(oportunidadBase({ etapaCRM: 7 })) as unknown as Cualquiera;
+    expect(validarOportunidad(cerrada)).toEqual([]);
+    cerrada.cerrada = false;
+    expect(validarOportunidad(cerrada).join(' ')).toMatch(/cerrada.*etapa/);
   });
 
   it('exige que eventos sea un arreglo', () => {

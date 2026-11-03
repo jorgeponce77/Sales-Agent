@@ -153,9 +153,13 @@ async function main() {
     await campo('Oportunidad').fill('WMS de humo');
     await campo('Tipo').selectOption('NN');
     await pagina.getByLabel('WMS (almacenes)').check();
-    await campo('TCV').fill('450,000');
     await campo('Fecha de cierre').fill('2027-12-31');
     await campo('¿Es RFP?').selectOption('no');
+    await campo('TCV').fill('380.000');
+    await pagina.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
+    await pagina.getByText('El TCV es ambiguo').waitFor();
+    await campo('TCV').fill('450,000');
+    await pagina.getByText('= 450,000 USD').waitFor();
     afirmar(await pagina.evaluate(() => document.documentElement.scrollWidth) <= ANCHO_MOVIL, 'el formulario no desborda a 390 px');
     await pagina.getByRole('button', { name: 'Iniciar sesión', exact: true }).click();
     await pagina.getByText('Ya existe una oportunidad con ese ID del CRM').waitFor();
@@ -164,7 +168,7 @@ async function main() {
     await pagina.getByLabel('Tu mensaje').waitFor({ timeout: 20_000 });
     await saludo.first().waitFor({ timeout: 20_000 });
     afirmar(await selector.inputValue() === 'op:OPP-HUMO-1', 'la oportunidad nueva queda seleccionada');
-    paso('oportunidad nueva: ID repetido rechazado, TCV con comas y ficha completa aceptados');
+    paso('oportunidad nueva: TCV ambiguo rechazado, monto entendido visible, ID repetido rechazado y ficha completa aceptada');
 
     // Móvil: captura y sin scroll horizontal
     await pagina.screenshot({ path: join(aqui, 'humo-movil.png'), fullPage: true });

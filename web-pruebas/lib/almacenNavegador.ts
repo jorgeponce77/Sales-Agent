@@ -2,8 +2,15 @@ import type { Oportunidad } from 'agente-sales-agent';
 
 export const CLAVE_ALMACEN = 'sa_oportunidades_v1';
 
-export type EstadoAlmacen = 'ok' | 'formato_incompatible' | 'sin_almacen';
-type StorageMinimo = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+export type EstadoAlmacen = 'ok' | 'formato_incompatible' | 'sin_almacen' | 'lleno';
+export type StorageMinimo = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+
+/** ¿El error de `setItem` es por cuota llena? (nombres y códigos de Chrome, Safari y Firefox) */
+export function esErrorDeCuota(e: unknown): boolean {
+  if (typeof e !== 'object' || e === null) return false;
+  const { name, code } = e as { name?: unknown; code?: unknown };
+  return name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED' || code === 22 || code === 1014;
+}
 
 export interface Almacen {
   listar(): Oportunidad[];
@@ -21,12 +28,15 @@ const esOportunidadGuardada = (x: unknown): boolean =>
 /**
  * Oportunidades de prueba en el navegador (solo cliente). Todo acceso al storage va en try/catch: sin storage
  * o si lanza, se trabaja en memoria (`sin_almacen`). Si lo guardado no se entiende, queda `formato_incompatible`,
- * se trabaja en memoria y no se pisa lo que había hasta que se llame a `reiniciar`.
+ * se trabaja en memoria y no se pisa lo que había hasta que se llame a `reiniciar`. Si el storage está lleno
+ * (`lleno`), lo último se conserva en memoria y se reintenta escribir en cada cambio: borrar oportunidades viejas
+ * libera espacio y vuelve a `ok`.
  */
 export function crearAlmacen(storage: StorageMinimo | null): Almacen {
   let estado: EstadoAlmacen = storage === null ? 'sin_almacen' : 'ok';
   let enMemoria = storage === null;
   let memoria: Oportunidad[] = [];
+  let sinEscribir = false; // cuota llena: `memoria` tiene lo último que no cupo en el storage
 
   const pasarAMemoria = (motivo: EstadoAlmacen): void => {
     enMemoria = true;
@@ -35,7 +45,7 @@ export function crearAlmacen(storage: StorageMinimo | null): Almacen {
   };
 
   const cargar = (): Oportunidad[] => {
-    if (enMemoria || storage === null) return memoria;
+    if (enMemoria || storage === null || sinEscribir) return memoria;
     let crudo: string | null;
     try {
       crudo = storage.getItem(CLAVE_ALMACEN);
@@ -65,7 +75,15 @@ export function crearAlmacen(storage: StorageMinimo | null): Almacen {
     }
     try {
       storage.setItem(CLAVE_ALMACEN, JSON.stringify(lista));
-    } catch {
+      sinEscribir = false;
+      if (estado === 'lleno') estado = 'ok';
+    } catch (e) {
+      if (esErrorDeCuota(e)) {
+        estado = 'lleno';
+        sinEscribir = true;
+        memoria = lista;
+        return;
+      }
       pasarAMemoria('sin_almacen');
       memoria = lista;
     }
@@ -86,6 +104,7 @@ export function crearAlmacen(storage: StorageMinimo | null): Almacen {
     },
     reiniciar() {
       memoria = [];
+      sinEscribir = false;
       if (storage === null) return;
       try {
         storage.removeItem(CLAVE_ALMACEN);

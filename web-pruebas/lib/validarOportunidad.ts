@@ -64,6 +64,18 @@ function validarSesionActual(s: unknown): string[] {
   return errores;
 }
 
+/** Foto opcional de una sesión archivada: expediente válido para el motor y diagnóstico null o con su índice. */
+function validarFoto(f: unknown, ruta: string): string[] {
+  if (!esObjeto(f)) return [`${ruta}: debe ser un objeto con expediente y diagnostico.`];
+  const e = validarExpedienteSeguro(f['expediente'], `${ruta}.expediente`);
+  if (e.length > 0) return e;
+  const d = f['diagnostico'];
+  const indice = esObjeto(d) ? d['indice'] : undefined;
+  const conIndice = esObjeto(indice) && esTexto(indice['semaforo']) && typeof indice['total'] === 'number';
+  if (d !== null && !conIndice) return [`${ruta}.diagnostico: debe ser null o un diagnóstico del motor.`];
+  return [];
+}
+
 function validarSesiones(sesiones: unknown): string[] {
   if (!Array.isArray(sesiones)) return ['sesiones: debe ser una lista.'];
   for (let i = 0; i < sesiones.length; i++) {
@@ -78,16 +90,21 @@ function validarSesiones(sesiones: unknown): string[] {
       const e = validarTranscripcion(s['transcripcion'], `${ruta}.transcripcion`);
       if (e.length > 0) return e;
     }
+    // Las sesiones archivadas antes de que existiera la foto no la traen.
+    if (s['foto'] !== undefined) {
+      const e = validarFoto(s['foto'], `${ruta}.foto`);
+      if (e.length > 0) return e;
+    }
   }
   return [];
 }
 
-function validarExpedienteSeguro(exp: unknown): string[] {
+function validarExpedienteSeguro(exp: unknown, ruta = 'expediente'): string[] {
   try {
     const errores = validarExpediente(exp as Parameters<typeof validarExpediente>[0]);
-    return errores.slice(0, MAX_ERRORES_EXPEDIENTE).map((e) => `expediente.${e.campo}: ${e.mensaje}`);
+    return errores.slice(0, MAX_ERRORES_EXPEDIENTE).map((e) => `${ruta}.${e.campo}: ${e.mensaje}`);
   } catch {
-    return ['expediente: la estructura no es válida.'];
+    return [`${ruta}: la estructura no es válida.`];
   }
 }
 
@@ -103,7 +120,14 @@ export function validarOportunidad(op: unknown): string[] {
   }
   const errores: string[] = [];
   if (!esTexto(op['id']) || op['id'] === '') errores.push('oportunidad.id: es obligatorio.');
-  if (typeof op['cerrada'] !== 'boolean') errores.push('oportunidad.cerrada: debe ser verdadero o falso.');
+  if (typeof op['cerrada'] !== 'boolean') {
+    errores.push('oportunidad.cerrada: debe ser verdadero o falso.');
+  } else {
+    const etapa = esObjeto(op['ficha']) ? op['ficha']['etapaCRM'] : undefined;
+    if (typeof etapa === 'number' && op['cerrada'] !== etapa >= 6) {
+      errores.push('oportunidad.cerrada: no coincide con ficha.etapaCRM (cerrada es etapa 6 a 8).');
+    }
+  }
   errores.push(...validarFicha(op['ficha']).map((e) => `ficha: ${e}`));
   errores.push(...validarExpedienteSeguro(op['expediente']));
   errores.push(...validarSesiones(op['sesiones']));

@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ejecutarTurno, iniciarSesion } from 'agente-sales-agent';
+import { crearClienteAnthropic, ejecutarTurno, iniciarSesion } from 'agente-sales-agent';
 import { obtenerCliente } from '../lib/clienteServidor';
 import { oportunidadBase } from './fabrica';
+
+vi.mock('agente-sales-agent', async (importarOriginal) => {
+  const original = await importarOriginal<typeof import('agente-sales-agent')>();
+  return { ...original, crearClienteAnthropic: vi.fn(original.crearClienteAnthropic) };
+});
 
 describe('obtenerCliente', () => {
   afterEach(() => {
@@ -98,5 +103,12 @@ describe('obtenerCliente', () => {
     vi.stubEnv('MODELO_FALSO', '');
     vi.stubEnv('ANTHROPIC_API_KEY', 'clave-falsa-solo-prueba');
     expect(typeof obtenerCliente().crear).toBe('function');
+  });
+
+  it('el cliente real reintenta 2 veces y espera hasta 120 s por llamada (Importante 4)', () => {
+    vi.stubEnv('MODELO_FALSO', '');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'clave-falsa-solo-prueba');
+    obtenerCliente();
+    expect(vi.mocked(crearClienteAnthropic)).toHaveBeenLastCalledWith('clave-falsa-solo-prueba', { maxRetries: 2, timeout: 120_000 });
   });
 });

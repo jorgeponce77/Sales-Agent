@@ -98,6 +98,25 @@ describe('almacén del navegador', () => {
     expect(a.listar()).toHaveLength(2);
   });
 
+  it('cuota llena (Menor 9): estado lleno, sigue en memoria y se recupera al liberar espacio', () => {
+    const s = storageFalso();
+    const a = crearAlmacen(s);
+    a.guardar(opA());
+    const original = s.setItem;
+    let lleno = true;
+    s.setItem = (k, v) => {
+      if (lleno) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' });
+      original(k, v);
+    };
+    expect(() => a.guardar(opB())).not.toThrow();
+    expect(a.estado).toBe('lleno');
+    expect(a.listar().map((o) => o.id)).toEqual(['OPP-A', 'OPP-B']);
+    lleno = false;
+    a.borrar('OPP-A');
+    expect(a.estado).toBe('ok');
+    expect(JSON.parse(s.datos[CLAVE_ALMACEN] as string).map((o: { id: string }) => o.id)).toEqual(['OPP-B']);
+  });
+
   it.each([
     ['un objeto que no es lista', '{"x":1}'],
     ['una lista con formato 0', '[{"formato":0}]'],

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { Linea, TipoOportunidad } from 'motor-sales-agent';
 import type { Ficha } from 'agente-sales-agent';
-import { etiquetaEtapa, ETAPAS, LINEAS, MONEDAS, PAISES, parsearTcv, TIPOS } from '../lib/catalogos';
+import { etiquetaEtapa, ETAPAS, formatearMonto, LINEAS, leerTcv, MONEDAS, PAISES, TIPOS } from '../lib/catalogos';
 
 /** Lo que captura el formulario; el servidor pone `fechaCreacion` y `vendedor`. */
 export type DatosFicha = Omit<Ficha, 'fechaCreacion' | 'vendedor'>;
@@ -15,6 +15,9 @@ interface Props {
   idsExistentes: readonly string[];
   onEnviar: (ficha: DatosFicha) => void;
 }
+
+/** Valor del selector de tipo cuando el vendedor no lo sabe: se envía `tipo: null` y el agente lo averigua. */
+const TIPO_NO_SE = 'nose';
 
 const hoyLocal = (): string => {
   const d = new Date();
@@ -35,8 +38,9 @@ function revisar(v: {
   if (v.cliente.trim() === '') errores.push('Escribe el nombre del cliente.');
   if (v.oportunidad.trim() === '') errores.push('Escribe el nombre de la oportunidad.');
   if (v.lineas.length === 0) errores.push('Elige al menos una línea.');
-  if (v.tipo === '') errores.push('Elige el tipo de oportunidad.');
-  if (parsearTcv(v.tcv) === null) errores.push('El TCV debe ser un número mayor que 0 (por ejemplo, 450000 o 450,000).');
+  if (v.tipo === '') errores.push('Elige el tipo de oportunidad (o "No sé").');
+  const tcv = leerTcv(v.tcv);
+  if (tcv.error !== null) errores.push(tcv.error);
   if (v.fechaCierre === '') errores.push('Elige la fecha de cierre del CRM.');
   else if (v.etapa <= 4 && v.fechaCierre < hoyLocal()) errores.push('La fecha de cierre no puede ser anterior a hoy.');
   return errores;
@@ -55,6 +59,7 @@ export default function FichaNueva({ ocupado, idsExistentes, onEnviar }: Props) 
   const [moneda, setMoneda] = useState('USD');
   const [fechaCierre, setFechaCierre] = useState('');
   const [errores, setErrores] = useState<string[]>([]);
+  const lecturaTcv = leerTcv(tcv);
 
   function alternarLinea(l: Linea): void {
     setLineas((actuales) => (actuales.includes(l) ? actuales.filter((x) => x !== l) : [...actuales, l]));
@@ -71,9 +76,9 @@ export default function FichaNueva({ ocupado, idsExistentes, onEnviar }: Props) 
       oportunidad: oportunidad.trim(),
       pais,
       lineas,
-      tipo: tipo as TipoOportunidad,
+      tipo: tipo === TIPO_NO_SE ? null : (tipo as TipoOportunidad),
       etapaCRM: etapa,
-      tcv: parsearTcv(tcv) as number,
+      tcv: lecturaTcv.monto as number,
       moneda,
       fechaCierreCRM: fechaCierre,
       probabilidadCRM: null,
@@ -89,15 +94,15 @@ export default function FichaNueva({ ocupado, idsExistentes, onEnviar }: Props) 
 
       <label>
         ID del CRM
-        <input value={idCRM} onChange={(e) => setIdCRM(e.target.value)} autoComplete="off" />
+        <input value={idCRM} onChange={(e) => setIdCRM(e.target.value)} autoComplete="off" maxLength={40} />
       </label>
       <label>
         Cliente
-        <input value={cliente} onChange={(e) => setCliente(e.target.value)} autoComplete="off" />
+        <input value={cliente} onChange={(e) => setCliente(e.target.value)} autoComplete="off" maxLength={120} />
       </label>
       <label>
         Oportunidad
-        <input value={oportunidad} onChange={(e) => setOportunidad(e.target.value)} autoComplete="off" />
+        <input value={oportunidad} onChange={(e) => setOportunidad(e.target.value)} autoComplete="off" maxLength={160} />
       </label>
 
       <div className="ficha-fila">
@@ -112,6 +117,7 @@ export default function FichaNueva({ ocupado, idsExistentes, onEnviar }: Props) 
           <select value={tipo} onChange={(e) => setTipo(e.target.value)}>
             <option value="">Elige un tipo</option>
             {TIPOS.map((t) => <option key={t.valor} value={t.valor}>{t.etiqueta}</option>)}
+            <option value={TIPO_NO_SE}>No sé</option>
           </select>
         </label>
       </div>
@@ -149,12 +155,16 @@ export default function FichaNueva({ ocupado, idsExistentes, onEnviar }: Props) 
         <label>
           TCV
           <input value={tcv} onChange={(e) => setTcv(e.target.value)} inputMode="decimal" autoComplete="off" placeholder="450000" />
+          <span className="ayuda" aria-live="polite">
+            {lecturaTcv.monto !== null ? `= ${formatearMonto(lecturaTcv.monto)} ${moneda}` : 'Solo dígitos (450000) o con comas de miles (450,000).'}
+          </span>
         </label>
         <label>
           Moneda
           <select value={moneda} onChange={(e) => setMoneda(e.target.value)}>
             {MONEDAS.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
+          <span className="ayuda">Por ahora solo USD.</span>
         </label>
       </div>
 

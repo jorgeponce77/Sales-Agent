@@ -1,5 +1,6 @@
 import type { Evidencia, Nivel } from 'motor-sales-agent';
 import type { Oportunidad } from 'agente-sales-agent';
+import { avisoTipoCambio } from '../lib/avisos';
 import { etiquetaEtapa } from '../lib/catalogos';
 
 const SEMAFORO = {
@@ -48,8 +49,10 @@ function Elemento({ nombre, ev }: { nombre: string; ev: Evidencia<string> }) {
 /** Resultado del motor sobre la oportunidad: semáforo, etapa, probabilidad, fecha, BANT, compelling event y banderas. */
 export default function PanelDiagnostico({ oportunidad }: { oportunidad: Oportunidad | null }) {
   const d = oportunidad?.ultimoDiagnostico ?? null;
+  const aviso = avisoTipoCambio(oportunidad);
+  const avisoMoneda = aviso === null ? null : <p className="panel-aviso" role="note">{aviso}</p>;
   if (oportunidad === null || d === null) {
-    return <p className="vacio">Aún sin diagnóstico</p>;
+    return <>{avisoMoneda}<p className="vacio">Aún sin diagnóstico</p></>;
   }
   const { expediente, ficha } = oportunidad;
   const ce = expediente.compellingEvent;
@@ -58,6 +61,7 @@ export default function PanelDiagnostico({ oportunidad }: { oportunidad: Oportun
 
   return (
     <div className="diagnostico">
+      {avisoMoneda}
       <div className={`semaforo semaforo-${semaforo}`} role="status">
         <span className="semaforo-luz" aria-hidden="true" />
         <span className="semaforo-texto">

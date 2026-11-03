@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { iniciarSesion, MODELO_DEFAULT } from 'agente-sales-agent';
+import { ejecutarTurno, iniciarSesion, MODELO_DEFAULT } from 'agente-sales-agent';
 import type { ResultadoTurno } from 'agente-sales-agent';
 import { calcularDiagnostico } from 'motor-sales-agent';
 import { obtenerCliente } from '../lib/clienteServidor';
@@ -275,6 +275,38 @@ describe('turnos', () => {
     vi.mocked(hoyMexico).mockReturnValue('2026-12-15');
     const { json } = await llamar({ accion: 'iniciar', ficha: fichaBase() });
     expect(json.oportunidad.sesionActual.inicio).toBe('2026-12-15');
+  });
+});
+
+describe('tope de 40 mensajes (Importante 1)', () => {
+  it('una oportunidad en 40 con un modelo que no cierra sigue usable en la solicitud siguiente', async () => {
+    const op = structuredClone(oportunidadBase()) as any;
+    op.sesionActual = {
+      modo: 'calificar', inicio: '2026-11-02', turnosVendedor: 40, versionInstrucciones: 'v',
+      historial: [{ role: 'user', content: [{ type: 'text', text: 'hola' }] }, { role: 'assistant', content: [{ type: 'text', text: 'ok' }] }],
+      transcripcion: [{ rol: 'vendedor', texto: 'hola', fecha: '2026-11-02' }, { rol: 'agente', texto: 'ok', fecha: '2026-11-02' }],
+    };
+    const primera = await llamar({ accion: 'mensaje', oportunidad: op, mensaje: 'una más' });
+    expect(primera.estado).toBe(200);
+    expect(primera.json.oportunidad.sesionActual).toBeNull();
+    expect(primera.json.oportunidad.sesiones.at(-1).resumen).toBe('Sesión interrumpida sin cierre del agente.');
+    expect(primera.json.oportunidad.sesiones.at(-1).foto.expediente).toEqual(primera.json.oportunidad.expediente);
+
+    const segunda = await llamar({ accion: 'mensaje', oportunidad: primera.json.oportunidad, mensaje: 'sigo' });
+    expect(segunda.estado).toBe(200);
+    expect(segunda.json.error).toBeNull();
+    expect(segunda.json.oportunidad.sesionActual.turnosVendedor).toBe(1);
+    const tercera = await llamar({ accion: 'iniciar', oportunidad: segunda.json.oportunidad });
+    expect(tercera.estado).toBe(200);
+  });
+});
+
+describe('presupuesto de tiempo (Importante 4)', () => {
+  it('pasa limiteMs de 240 s al iniciar y en cada turno', async () => {
+    const primera = await llamar({ accion: 'iniciar', ficha: fichaBase() });
+    await llamar({ accion: 'mensaje', oportunidad: primera.json.oportunidad, mensaje: 'hola' });
+    expect(vi.mocked(iniciarSesion).mock.calls[0]?.[2]).toMatchObject({ limiteMs: 240_000 });
+    expect(vi.mocked(ejecutarTurno).mock.calls[0]?.[2]).toMatchObject({ limiteMs: 240_000 });
   });
 });
 

@@ -12,6 +12,8 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const ACCIONES = ['iniciar', 'mensaje', 'cerrar'];
+// Presupuesto del turno: al pasarlo, el agente responde sin más herramientas; deja margen antes de maxDuration.
+const LIMITE_TURNO_MS = 240_000;
 const VENDEDOR_PRUEBAS = 'prueba';
 
 /** Oportunidad nueva desde una ficha; la valida y devuelve el error en español si no sirve. */
@@ -76,6 +78,7 @@ export async function POST(req: Request): Promise<Response> {
       cliente: obtenerCliente(),
       hoy,
       modelo: process.env.MODELO_AGENTE || undefined,
+      limiteMs: LIMITE_TURNO_MS,
       registrarError: (e) => console.error('[api/turno] fallo de la API', resumenError(e)),
     };
     const resultado = accion === 'iniciar'
