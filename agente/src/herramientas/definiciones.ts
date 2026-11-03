@@ -98,7 +98,7 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
       type: 'object',
       properties: {
         personaId: { type: 'string', description: 'Identificador de una influencia ya registrada (opcional).' },
-        nombre: { type: 'string', description: 'Nombre de la persona.' },
+        nombre: { type: 'string', maxLength: 120, description: 'Nombre de la persona (máximo 120 caracteres).' },
         roles: { type: 'array', items: { type: 'string', enum: ROLES }, description: 'Roles que cumple en la compra.' },
         grado: { type: ['string', 'null'], enum: [...GRADO, null], description: 'Grado de influencia.' },
         modo: { type: ['string', 'null'], enum: [...MODO, null], description: 'Modo de la persona.' },
@@ -115,9 +115,12 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
   {
     name: 'registrar_alternativa',
     description:
-      'Registra una alternativa a la compra (otro proveedor, solución interna, presupuesto o no hacer nada) y su posición; ' +
-      'también marca que la pregunta de competencia ya se hizo. Úsala cuando el vendedor diga contra qué o quién compite la oportunidad, ' +
-      'incluso si dice que no hay competencia (entonces registra "no_hacer_nada"). Si ya existe (mismo tipo y nombre), actualiza su posición.',
+      'Registra una alternativa a la compra (otro proveedor, solución interna, presupuesto en otra cosa o no hacer nada) y su posición; ' +
+      'también marca que la pregunta de competencia ya se hizo. Úsala cuando el vendedor diga contra qué o quién compite la oportunidad. ' +
+      'Si dice que no hay competencia, antes de registrar pregunta si hay una solución interna, si el presupuesto se podría ir a otra cosa y si el cliente podría no hacer nada; ' +
+      'registra la que exista con su tipo y posición. Registra "no_hacer_nada" con posición "nula" solo si de verdad no hay alternativa de ningún tipo. ' +
+      'Para el motor la posición general es la peor de las alternativas registradas, y es Nula si no hay ninguna (con la pregunta hecha) o si todas están en nula. ' +
+      'Si ya existe (mismo tipo y nombre), actualiza su posición.',
     input_schema: {
       type: 'object',
       properties: {
@@ -190,7 +193,7 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     description:
       'Propone las acciones siguientes (máximo 5, a 30 días). Cada una debe atender una bandera o fortaleza del diagnóstico (campo "atiende" = su id), ' +
       'con qué se hará, quién y para cuándo. El motor las valida: las aceptadas se guardan como abiertas y las rechazadas vuelven con su motivo para que las corrijas. ' +
-      'Úsala después de calcular el diagnóstico.',
+      'El siguiente paso que mencione el vendedor no tiene otro campo: entra aquí como acción. Úsala después de calcular el diagnóstico.',
     input_schema: {
       type: 'object',
       properties: {
@@ -228,8 +231,10 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
   {
     name: 'cerrar_sesion',
     description:
-      'Cierra la sesión con un resumen corto en español (2 a 4 líneas, máximo 600 caracteres): qué cambió, el diagnóstico en una frase y las acciones acordadas. ' +
-      'Úsala solo cuando el vendedor pida cerrar o se llegue al tope de la sesión, después de dar el diagnóstico.',
+      'Cierra la sesión con un resumen corto en español (2 a 4 líneas, máximo 600 caracteres): qué cambió, el diagnóstico en una frase, el siguiente paso y las acciones acordadas. ' +
+      'Úsala solo cuando el vendedor pida terminar, cuando acepte después de que tú propusiste cerrar (revisión rápida completa o huecos críticos cubiertos) ' +
+      'o al llegar el mensaje interno de cierre (botón Terminar sesión o tope de mensajes); siempre después de dar el diagnóstico. ' +
+      'Nunca cierres por tu cuenta sin proponerlo antes.',
     input_schema: {
       type: 'object',
       properties: { resumen: { type: 'string', maxLength: 600, description: 'Resumen de 2 a 4 líneas, en español.' } },

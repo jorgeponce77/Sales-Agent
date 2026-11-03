@@ -175,8 +175,8 @@ function bloqueSesiones(op: Oportunidad): string[] {
 }
 
 /**
- * Instrucciones del sistema para un turno: `fijo` (cacheable, igual para toda oportunidad)
- * y `variable` (hoy, modo, lente, ficha, expediente resumido, diagnóstico y memoria).
+ * Instrucciones para un turno: `fijo` (el system, cacheable, igual para toda oportunidad) y `variable`
+ * (hoy, modo, lente, ficha, expediente resumido, diagnóstico y memoria), que va en el mensaje del turno.
  * `diag` es el diagnóstico vigente, calculado al inicio del turno.
  */
 export function construirInstrucciones(
@@ -191,8 +191,8 @@ export function construirInstrucciones(
   const sesion = ultima ? `Retorno desde ${ultima.fecha}` : 'Sesión nueva (primera sesión de esta oportunidad)';
   const mensajes = op.sesionActual ? ` · mensajes del vendedor en esta sesión: ${op.sesionActual.turnosVendedor} de 40` : '';
 
+  // Sin encabezado: el bloque llega con la marca "[Contexto de esta sesión]" al inicio del mensaje del turno.
   const lineas = [
-    '# Contexto de esta sesión',
     `Hoy: ${hoy} · Modo: ${modo} · Lente: ${lente}`,
     `Sesión: ${sesion}${mensajes}`,
     `Ficha (CRM): ${f.idCRM} · ${f.cliente} · ${f.oportunidad} · ${f.pais} · ${f.lineas.join('+')} · tipo ${f.tipo ?? 'sin dato'} · etapa ${f.etapaCRM} · TCV ${f.tcv} ${f.moneda} · creada ${f.fechaCreacion} · cierre ${f.fechaCierreCRM} · RFP ${siNo(f.esRFP)} · prob. CRM ${f.probabilidadCRM === null ? '?' : `${f.probabilidadCRM}%`} · últ. act. CRM ${f.ultimaActualizacionCRM ?? '?'}`,

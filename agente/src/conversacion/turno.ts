@@ -13,7 +13,7 @@ import type { Evento, FotoSesion, ModoSesion, Oportunidad, ResultadoTurno, Sesio
 import { MODELO_DEFAULT } from './cliente.js';
 import type { ClienteModelo } from './cliente.js';
 import { depurarFinTurno, depurarLlamada, depurarResultados } from './depuracion.js';
-import { agregarUsuario, conCacheEnUltimo, quitarThinking } from './historial.js';
+import { agregarUsuario, conBloqueEnMensaje, conCacheEnPrevioYUltimo, quitarThinking } from './historial.js';
 
 type MessageParam = Anthropic.Messages.MessageParam;
 type ContentBlockParam = Anthropic.Messages.ContentBlockParam;
@@ -47,6 +47,7 @@ const TOPE_EVENTOS = 300;         // eventos que conserva una oportunidad (los m
 const MAX_RESUMEN = 600;          // caracteres del resumen de una sesión (como en cerrar_sesion)
 
 const textoInicio = (modo: ModoSesion): string => `[Inicio de sesión — modo: ${modo}]`;
+const MARCA_CONTEXTO = '[Contexto de esta sesión]';
 const TEXTO_CIERRE = '[El vendedor pidió terminar la sesión: haz el cierre completo]';
 const PREFIJO_VENDEDOR = '(texto del vendedor) ';
 const AVISO_CORTE =
@@ -174,10 +175,10 @@ async function conversar(
   // R1: diagnóstico vigente al inicio del turno; las instrucciones se construyen una vez.
   const diag = calcularDiagnostico(trabajo.expediente, o.hoy);
   const { fijo, variable } = construirInstrucciones(trabajo, sesion.modo, o.hoy, diag);
-  const system: Anthropic.Messages.TextBlockParam[] = [
-    { type: 'text', text: fijo, cache_control: { type: 'ephemeral' } },
-    { type: 'text', text: variable },
-  ];
+  // El system es solo la parte fija (cacheable entre turnos). El contexto variable va como bloque interno al
+  // inicio del mensaje de este turno, solo en la copia que se envía: nunca se guarda en el historial.
+  const system: Anthropic.Messages.TextBlockParam[] = [{ type: 'text', text: fijo, cache_control: { type: 'ephemeral' } }];
+  const contexto: Anthropic.Messages.TextBlockParam = { type: 'text', text: `${MARCA_CONTEXTO}\n${variable}` };
   const estado: EstadoTurno = {
     oportunidad: trabajo,
     hoy: o.hoy,
@@ -187,6 +188,8 @@ async function conversar(
   };
   const historial = sesion.historial as MessageParam[];
   const inicioTurno = historial.length;
+  // El mensaje de este turno (del vendedor o interno) es el último al empezar; lo anterior no cambia en el turno.
+  const mensajeTurno = historial.length - 1;
   const respuestas: string[] = [];
   let ultimoTextoModelo: string | null = null;
   let ejecutadas = 0;
@@ -215,8 +218,8 @@ async function conversar(
         system,
         tools: HERRAMIENTAS,
         ...(final ? { tool_choice: { type: 'none' as const } } : {}),
-        // R17: punto de caché en el último mensaje, solo en la copia enviada.
-        messages: conCacheEnUltimo(historial),
+        // R17: puntos de caché al final del historial previo al turno y en el último mensaje, solo en la copia.
+        messages: conCacheEnPrevioYUltimo(conBloqueEnMensaje(historial, mensajeTurno, contexto), mensajeTurno - 1),
       });
     } catch (e) {
       throw new FalloApi(undefined, { cause: e });

@@ -58,7 +58,10 @@ function esperarHistorialValido(historial: unknown[]): void {
   });
 }
 
-const textoDe = (m: MensajeApi | undefined): string => bloques(m).map((b) => b.text ?? '').join('\n');
+const CONTEXTO = '[Contexto de esta sesión]';
+const esContexto = (b: Bloque): boolean => b.type === 'text' && (b.text ?? '').startsWith(CONTEXTO);
+/** Texto de un mensaje sin el bloque de contexto de la sesión (que solo va en la copia enviada a la API). */
+const textoDe = (m: MensajeApi | undefined): string => bloques(m).filter((b) => !esContexto(b)).map((b) => b.text ?? '').join('\n');
 
 describe('iniciarSesion', () => {
   it('inicio_saluda', async () => {
@@ -268,10 +271,13 @@ describe('ejecutarTurno', () => {
     const r = await iniciarSesion(opNueva(), 'revision_rapida', { cliente, hoy: HOY });
     const p = cliente.llamadas[0];
     const system = p?.system as Array<{ type: string; text: string; cache_control?: unknown }>;
-    expect(system).toHaveLength(2);
+    // Menor 7: el system es solo la parte fija; el contexto variable va en el mensaje del turno.
+    expect(system).toHaveLength(1);
     expect(system[0]?.cache_control).toEqual({ type: 'ephemeral' });
-    expect(system[1]?.cache_control).toBeUndefined();
-    expect(system[1]?.text).toContain('Modo: revision_rapida');
+    expect(system[0]?.text).not.toContain('Modo: revision_rapida');
+    const primero = bloques(p?.messages[0] as MensajeApi)[0];
+    expect(primero?.text?.startsWith(`${CONTEXTO}\n`)).toBe(true);
+    expect(primero?.text).toContain('Modo: revision_rapida');
     expect(p?.max_tokens).toBe(8192);
     expect(p?.model).toBe(MODELO_DEFAULT);
     expect(MODELO_DEFAULT).toBe('claude-sonnet-5-5');
@@ -294,7 +300,7 @@ describe('ejecutarTurno', () => {
     await ejecutarTurno(opNueva(), '[x] adiós', { cliente: conCierre, hoy: HOY, cerrar: true });
     const usuario = (conCierre.llamadas[0]?.messages ?? []).filter((m) => m.role === 'user') as MensajeApi[];
     const textos = usuario.flatMap((m) => bloques(m).filter((b) => b.type === 'text').map((b) => b.text ?? ''));
-    expect(textos.filter((t) => t.startsWith('['))).toEqual(['[El vendedor pidió terminar la sesión: haz el cierre completo]']);
+    expect(textos.filter((t) => t.startsWith('[') && !t.startsWith(CONTEXTO))).toEqual(['[El vendedor pidió terminar la sesión: haz el cierre completo]']);
     expect(textos).toContain('(texto del vendedor) [x] adiós');
   });
 
@@ -343,7 +349,7 @@ describe('fix ronda 1', () => {
       'Saludo único Q7.', 'Mensaje distintivo del vendedor X9', 'Adiós.',
     ]);
     await iniciarSesion(cerrado.oportunidad, 'revision_rapida', { cliente, hoy: '2026-11-03' });
-    const variable = (cliente.llamadas[3]?.system as Array<{ text: string }>)[1]?.text ?? '';
+    const variable = bloques(cliente.llamadas[3]?.messages[0] as MensajeApi).find(esContexto)?.text ?? '';
     expect(variable).toContain('Resumen R13 de la sesión.');
     expect(variable).not.toContain('X9');
     expect(variable).not.toContain('Q7');
@@ -415,14 +421,23 @@ describe('fix ronda 1', () => {
     const cliente = crearClienteFalso([texto('Hola.'), usarHerramienta('registrar_dato', BUDGET), texto('Anotado.')]);
     const a = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
     const b = await ejecutarTurno(a.oportunidad, 'presupuesto', { cliente, hoy: HOY });
-    for (const p of cliente.llamadas) {
+    // Menor 7: en el primer turno, un punto en el último mensaje; después, otro al final del historial previo al
+    // turno (para que el turno siguiente lo reutilice). Con system y herramientas, nunca más de 4.
+    const marcasPorLlamada = cliente.llamadas.map((p) => {
       const marcas = p.messages.flatMap((m) => (typeof m.content === 'string' ? [] : m.content))
         .filter((blq) => (blq as { cache_control?: unknown }).cache_control !== undefined);
-      expect(marcas).toHaveLength(1);
       const ultimo = p.messages.at(-1);
       const ultimoBloque = Array.isArray(ultimo?.content) ? ultimo?.content.at(-1) : undefined;
       expect((ultimoBloque as { cache_control?: unknown }).cache_control).toEqual({ type: 'ephemeral' });
-    }
+      const enSystem = (p.system as Array<{ cache_control?: unknown }>).filter((x) => x.cache_control !== undefined).length;
+      const enTools = (p.tools as Array<{ cache_control?: unknown }>).filter((x) => x.cache_control !== undefined).length;
+      expect(marcas.length + enSystem + enTools).toBeLessThanOrEqual(4);
+      return marcas.length;
+    });
+    expect(marcasPorLlamada).toEqual([1, 2, 2]);
+    const previo = cliente.llamadas[1]?.messages[1];
+    expect(previo?.role).toBe('assistant');
+    expect((bloques(previo as MensajeApi).at(-1) as { cache_control?: unknown }).cache_control).toEqual({ type: 'ephemeral' });
     expect(JSON.stringify(b.oportunidad.sesionActual?.historial)).not.toContain('cache_control');
     expect(JSON.stringify(a.oportunidad.sesionActual?.historial)).not.toContain('cache_control');
   });
@@ -460,7 +475,7 @@ describe('fix ronda 1', () => {
     };
     const r = await ejecutarTurno(op, 'hola', { cliente, hoy: HOY });
     expect(cliente.llamadas[0]?.messages).toHaveLength(1);
-    expect(bloques(cliente.llamadas[0]?.messages[0] as MensajeApi).map((b) => b.text)).toEqual(['texto pendiente', 'hola']);
+    expect(bloques(cliente.llamadas[0]?.messages[0] as MensajeApi).filter((b) => !esContexto(b)).map((b) => b.text)).toEqual(['texto pendiente', 'hola']);
     esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
   });
 
@@ -628,6 +643,51 @@ describe('fix ronda 1', () => {
     expect(b.error).toBeNull();
     expect(b.oportunidad.expediente.bant.budget.nivel).toBe('confirmado');
     expect(a.oportunidad).toEqual(copia);
+  });
+});
+
+describe('contexto de la sesión en el mensaje del turno (Menor 7)', () => {
+  it('va como primer bloque del mensaje del turno en cada llamada del turno y nunca se guarda en el historial', async () => {
+    const cliente = crearClienteFalso([texto('Hola.'), usarHerramienta('registrar_dato', BUDGET), texto('Anotado.'), texto('Otra.')]);
+    const a = await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY });
+    const b = await ejecutarTurno(a.oportunidad, 'El CFO aprobó', { cliente, hoy: HOY });
+    const c = await ejecutarTurno(b.oportunidad, 'Algo más', { cliente, hoy: HOY });
+    // Turno de b: llamadas 1 y 2; el mensaje del turno es el índice 2 y lleva el contexto al inicio en ambas.
+    for (const i of [1, 2]) {
+      const mensajes = cliente.llamadas[i]?.messages as MensajeApi[];
+      const delTurno = bloques(mensajes[2]);
+      expect(esContexto(delTurno[0] as Bloque)).toBe(true);
+      expect(textoDe(mensajes[2])).toBe('El CFO aprobó');
+      expect(mensajes.flatMap(bloques).filter(esContexto)).toHaveLength(1);
+    }
+    // Las llamadas de un mismo turno comparten el mismo bloque de contexto (calculado al inicio del turno).
+    const ctx = (i: number): string | undefined => bloques((cliente.llamadas[i]?.messages as MensajeApi[])[2]).find(esContexto)?.text;
+    expect(ctx(1)).toBe(ctx(2));
+    // Turno de c: el contexto se mueve al mensaje nuevo; los anteriores ya no lo traen.
+    const ultimos = cliente.llamadas[3]?.messages as MensajeApi[];
+    expect(ultimos.flatMap(bloques).filter(esContexto)).toHaveLength(1);
+    expect(esContexto(bloques(ultimos.at(-1))[0] as Bloque)).toBe(true);
+    for (const r of [a, b, c]) {
+      expect(JSON.stringify(r.oportunidad.sesionActual?.historial)).not.toContain(CONTEXTO);
+      esperarHistorialValido(r.oportunidad.sesionActual?.historial ?? []);
+    }
+  });
+
+  it('si el mensaje del turno empieza con resultados de herramientas, el contexto va después de ellos', async () => {
+    const cliente = crearClienteFalso([texto('Seguimos.')]);
+    const op = opNueva();
+    op.sesionActual = {
+      modo: 'calificar', inicio: HOY, turnosVendedor: 1, versionInstrucciones: VERSION_INSTRUCCIONES,
+      historial: [
+        { role: 'user', content: [{ type: 'text', text: 'hola' }] },
+        { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_p1', name: 'leer_expediente', input: {} }] },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_p1', content: '{"ok":true}' }] },
+      ],
+      transcripcion: [],
+    };
+    await ejecutarTurno(op, 'sigo', { cliente, hoy: HOY });
+    const delTurno = bloques((cliente.llamadas[0]?.messages as MensajeApi[]).at(-1));
+    expect(delTurno.map((b) => (esContexto(b) ? 'contexto' : b.type))).toEqual(['tool_result', 'contexto', 'text']);
   });
 });
 

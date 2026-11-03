@@ -92,8 +92,57 @@ describe('construirInstrucciones', () => {
     }
   });
 
+  it('mensajes_internos_listados (Menor 7)', () => {
+    const { fijo } = construir(opAlfa());
+    const seccion = fijo.slice(fijo.indexOf('**Mensajes internos.**'), fijo.indexOf('## 2. Reglas de conversación'));
+    expect(seccion).toContain('"[Contexto de esta sesión]"');
+    expect(seccion).toContain('"[Tu respuesta anterior se cortó por longitud');
+    expect(seccion).toContain('"(texto del vendedor) "');
+  });
+
+  it('variable_sin_encabezado_propio (Menor 7)', () => {
+    expect(construir(opAlfa()).variable.startsWith('Hoy: ')).toBe(true);
+  });
+
+  it('cierre_solo_si_lo_pide_o_acepta_la_propuesta (Menor 4)', () => {
+    const { fijo } = construir(opAlfa());
+    expect(fijo).toContain('Nunca cierres por tu cuenta sin proponerlo');
+    expect(fijo).not.toContain('Cierra cuando el vendedor lo pida, cuando ya cubriste');
+    const cerrar = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'cerrar_sesion')?.description ?? '';
+    expect(cerrar).toContain('acepte');
+    expect(cerrar).toContain('propusiste');
+    expect(cerrar).toContain('Nunca cierres por tu cuenta sin proponerlo');
+  });
+
+  it('siguiente_paso_va_a_acciones_y_resumen (Menor 5)', () => {
+    const { fijo } = construir(opAlfa());
+    expect(fijo).not.toContain('pasos de la cadena y siguiente paso');
+    expect(fijo).toContain('El siguiente paso no tiene campo en el expediente');
+    const proponer = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'proponer_acciones')?.description ?? '';
+    expect(proponer).toContain('siguiente paso');
+    const cerrar = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'cerrar_sesion')?.description ?? '';
+    expect(cerrar).toContain('siguiente paso');
+  });
+
+  it('sin_competencia_pregunta_primero_las_otras_alternativas (Menor 3)', () => {
+    const alt = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'registrar_alternativa')?.description ?? '';
+    expect(alt).not.toContain('incluso si dice que no hay competencia (entonces registra "no_hacer_nada")');
+    for (const t of ['solución interna', 'presupuesto', 'no hacer nada', '"no_hacer_nada" con posición "nula"', 'solo si']) expect(alt).toContain(t);
+    const { fijo } = construir(opAlfa());
+    expect(fijo).toContain('Para el motor, la posición es Nula');
+  });
+
+  it('etapa_cerrada_archiva_la_sesion (Menor 6)', () => {
+    expect(construir(opAlfa()).fijo).toContain('Si con `actualizar_ficha` la etapa pasa a 6, 7 u 8');
+  });
+
+  it('nombre_de_influencia_con_maximo (Menor 10)', () => {
+    const inf = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'registrar_influencia');
+    expect((inf?.input_schema.properties['nombre'] as { maxLength?: number }).maxLength).toBe(120);
+  });
+
   it('version', () => {
-    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.2');
+    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.3');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
   });
 });
