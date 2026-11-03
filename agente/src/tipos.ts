@@ -11,9 +11,13 @@ export interface Ficha {
 
 export interface Evento { tipo: 'dato' | 'rechazo' | 'ficha' | 'accion' | 'sesion' | 'error'; descripcion: string; fecha: string }
 export interface Mensaje { rol: 'vendedor' | 'agente'; texto: string; fecha: string }
+/** Copia completa del expediente y del diagnóstico al cerrar una sesión (spec §5), para el historial. */
+export interface FotoSesion { expediente: Expediente; diagnostico: Diagnostico | null }
+
 export interface ResumenSesion {
   fecha: string; modo: ModoSesion; resumen: string; versionInstrucciones: string;
   transcripcion: Mensaje[];    // conversación de la sesión, para el usuario; la memoria del agente usa solo `resumen`
+  foto?: FotoSesion;           // ausente en sesiones guardadas antes de que existiera
 }
 
 export interface SesionActual {

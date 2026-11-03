@@ -1,5 +1,5 @@
 import type { Diagnostico } from 'motor-sales-agent';
-import type { Mensaje, Oportunidad } from '../tipos.js';
+import type { Mensaje, Oportunidad, ResumenSesion } from '../tipos.js';
 
 const ROL: Record<Mensaje['rol'], string> = { vendedor: 'Vendedor', agente: 'Agente' };
 
@@ -19,7 +19,15 @@ function bloqueDiagnostico(d: Diagnostico | null): string[] {
   ];
 }
 
-/** Ficha + cada sesión pasada (fecha, modo, resumen y mensajes) + la sesión en curso + último diagnóstico, en texto plano. */
+/** Tendencia: semáforo e índice de la foto al cierre de la sesión; nada si la sesión no trae foto (formato anterior). */
+function lineaFoto(sesion: ResumenSesion): string[] {
+  if (sesion.foto === undefined) return [];
+  const d = sesion.foto.diagnostico;
+  if (d === null) return ['Al cierre: sin diagnóstico'];
+  return [`Al cierre: semáforo ${d.indice.semaforo} · índice ${d.indice.total}/100${d.indice.topado ? ' (topado por crítica)' : ''}`];
+}
+
+/** Ficha + cada sesión pasada (fecha, modo, resumen, semáforo al cierre y mensajes) + la sesión en curso + último diagnóstico, en texto plano. */
 export function formatearTranscripcion(op: Oportunidad): string {
   const f = op.ficha;
   const lineas = [
@@ -28,7 +36,7 @@ export function formatearTranscripcion(op: Oportunidad): string {
     '',
   ];
   op.sesiones.forEach((sesion, i) => {
-    lineas.push(`Sesión ${i + 1} · ${sesion.fecha} · modo ${sesion.modo}`, `Resumen: ${sesion.resumen}`);
+    lineas.push(`Sesión ${i + 1} · ${sesion.fecha} · modo ${sesion.modo}`, `Resumen: ${sesion.resumen}`, ...lineaFoto(sesion));
     lineas.push(...mensajes(sesion.transcripcion), '');
   });
   const s = op.sesionActual;

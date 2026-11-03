@@ -364,6 +364,15 @@ describe('registrarInfluencia', () => {
     expect(registrarInfluencia(e, { contactada: true }).ok).toBe(false);
     expect(registrarInfluencia(e, null).ok).toBe(false);
   });
+
+  it('influencia_nombre_maximo_120 (Menor 10)', () => {
+    const e = estadoBase();
+    expect(registrarInfluencia(e, { nombre: 'n'.repeat(120) }).ok).toBe(true);
+    const r = registrarInfluencia(e, { nombre: 'm'.repeat(121) });
+    expect(r.ok).toBe(false);
+    expect(errores(r).join(' ')).toContain('120');
+    expect(e.oportunidad.expediente.influencias).toHaveLength(1);
+  });
 });
 
 describe('registrarAlternativa', () => {

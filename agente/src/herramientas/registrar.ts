@@ -249,10 +249,15 @@ const CAMPOS_INFLUENCIA = [
   'nuevaEnPuesto', 'trDeclaracion', 'prioridad',
 ] as const;
 
+export const MAX_NOMBRE_INFLUENCIA = 120;
+
 export const registrarInfluencia: Herramienta = segura('registrar_influencia', (estado, input) => {
   if (!esObjeto(input)) return entradaInvalida(estado, 'registrar_influencia');
   const { personaId, nombre } = input;
   if (nombre !== undefined && !esTexto(nombre)) return rechazar(estado, 'influencia', ['nombre: debe ser texto']);
+  if (typeof nombre === 'string' && nombre.length > MAX_NOMBRE_INFLUENCIA) {
+    return rechazar(estado, 'influencia', [`nombre: máximo ${MAX_NOMBRE_INFLUENCIA} caracteres`]);
+  }
   if (personaId !== undefined && typeof personaId !== 'string') {
     return rechazar(estado, 'influencia', ['personaId: debe ser texto']);
   }

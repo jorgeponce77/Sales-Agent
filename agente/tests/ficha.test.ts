@@ -88,4 +88,15 @@ describe('ficha', () => {
   it('expediente_resultante_valido', () => {
     expect(validarExpediente(fichaAExpediente(fichaBase(), TIPOS_CAMBIO_DEFAULT))).toEqual([]);
   });
+
+  it('ficha_limita_textos (Menor 10)', () => {
+    const limites: Array<[string, number]> = [['cliente', 120], ['oportunidad', 160], ['idCRM', 40], ['vendedor', 80]];
+    for (const [campo, max] of limites) {
+      expect(validarFicha(fichaBase({ [campo]: 'x'.repeat(max) } as never)), campo).toEqual([]);
+      const errores = validarFicha(fichaBase({ [campo]: 'x'.repeat(max + 1) } as never));
+      expect(errores, campo).toHaveLength(1);
+      expect(errores[0], campo).toContain(campo);
+      expect(errores[0], campo).toContain(String(max));
+    }
+  });
 });

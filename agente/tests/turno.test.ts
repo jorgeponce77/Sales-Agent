@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { calcularDiagnostico } from 'motor-sales-agent';
 import { MODELO_DEFAULT } from '../src/conversacion/cliente.js';
 import { formatearTranscripcion } from '../src/conversacion/transcripcion.js';
 import { ejecutarTurno, iniciarSesion } from '../src/conversacion/turno.js';
@@ -236,6 +237,7 @@ describe('ejecutarTurno', () => {
           { rol: 'agente', texto: 'Hola, ¿cuál es el estatus?', fecha: HOY },
           { rol: 'agente', texto: 'Cerramos por hoy.', fecha: HOY },
         ],
+        foto: { expediente: r.oportunidad.expediente, diagnostico: r.oportunidad.ultimoDiagnostico },
       },
     ]);
     expect(r.oportunidad.sesionActual).toBeNull();
@@ -255,8 +257,10 @@ describe('ejecutarTurno', () => {
     const enviado = textoDe(cliente.llamadas[0]?.messages.at(-1) as MensajeApi);
     expect(enviado).toContain('terminar la sesión');
     expect(enviado).toContain('una cosa más');
-    expect(r.oportunidad.sesionActual?.transcripcion[0]).toEqual({ rol: 'vendedor', texto: 'una cosa más', fecha: HOY });
-    expect(r.oportunidad.sesionActual?.turnosVendedor).toBe(41);
+    // El modelo no llamó a cerrar_sesion: la sesión se archiva como interrumpida y la oportunidad sigue usable.
+    expect(r.oportunidad.sesionActual).toBeNull();
+    expect(r.oportunidad.sesiones.at(-1)?.resumen).toBe('Sesión interrumpida sin cierre del agente.');
+    expect(r.oportunidad.sesiones.at(-1)?.transcripcion[0]).toEqual({ rol: 'vendedor', texto: 'una cosa más', fecha: HOY });
   });
 
   it('cache_control_en_fijo', async () => {
@@ -377,6 +381,7 @@ describe('fix ronda 1', () => {
         resumen: 'Sesión interrumpida sin cierre del agente.',
         versionInstrucciones: VERSION_INSTRUCCIONES,
         transcripcion: b.oportunidad.sesionActual?.transcripcion,
+        foto: { expediente: b.oportunidad.expediente, diagnostico: calcularDiagnostico(b.oportunidad.expediente, '2026-11-04') },
       },
     ]);
     expect(c.oportunidad.sesionActual?.modo).toBe('revision_rapida');

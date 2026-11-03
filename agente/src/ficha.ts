@@ -9,6 +9,16 @@ const TIPOS = ['NN', 'ENxT', 'EN', 'EE'];
 
 const esTextoNoVacio = (x: unknown): x is string => typeof x === 'string' && x.trim() !== '';
 
+/** Largo máximo de los textos libres de la ficha. */
+export const MAX_TEXTO_FICHA = { idCRM: 40, cliente: 120, oportunidad: 160, vendedor: 80 } as const;
+
+/** Error de largo de un texto libre de la ficha, o null si cabe (o si no es texto: eso lo reporta otra regla). */
+function errorLargo(o: Record<string, unknown>, campo: keyof typeof MAX_TEXTO_FICHA): string | null {
+  const v = o[campo];
+  const max = MAX_TEXTO_FICHA[campo];
+  return typeof v === 'string' && v.length > max ? `${campo}: máximo ${max} caracteres.` : null;
+}
+
 /** Errores en español de una ficha de CRM; lista vacía si es válida. Nunca lanza. */
 export function validarFicha(f: unknown): string[] {
   if (typeof f !== 'object' || f === null || Array.isArray(f)) return ['La ficha debe ser un objeto.'];
@@ -45,6 +55,10 @@ export function validarFicha(f: unknown): string[] {
   if (!fechaValida(o['fechaCierreCRM'])) errores.push('fechaCierreCRM: debe ser una fecha válida con formato AAAA-MM-DD.');
   if (!fechaValida(o['fechaCreacion'])) errores.push('fechaCreacion: debe ser una fecha válida con formato AAAA-MM-DD.');
   if (!esTextoNoVacio(o['vendedor'])) errores.push('vendedor: es obligatorio.');
+  for (const campo of ['idCRM', 'cliente', 'oportunidad', 'vendedor'] as const) {
+    const e = errorLargo(o, campo);
+    if (e !== null) errores.push(e);
+  }
 
   return errores;
 }

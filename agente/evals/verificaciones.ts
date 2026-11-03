@@ -1,3 +1,4 @@
+import { idiomaDe } from '../src/idioma.js';
 import type { Escenario, Mensaje, Oportunidad } from '../src/index.js';
 
 export interface Verificacion { nombre: string; ok: boolean; detalle: string }
@@ -18,25 +19,6 @@ function normalizar(t: string): string {
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
-}
-
-// Heurística: listas cortas de palabras frecuentes que no se escriben igual en el otro idioma.
-const PALABRAS_ES = new Set(
-  'el la los las de que y en un una es por con para se su lo como más pero del al está son hay qué cuál esto muy ya también tiene tienes cuándo quién cómo'.split(' '),
-);
-const PALABRAS_EN = new Set(
-  'the and of to is in that for with are was your you have this it be what not on will can do who when how has there their'.split(' '),
-);
-
-function idiomaDe(texto: string): 'es' | 'en' | null {
-  let es = 0;
-  let en = 0;
-  for (const p of texto.toLowerCase().match(/\p{L}+/gu) ?? []) {
-    if (PALABRAS_ES.has(p)) es += 1;
-    if (PALABRAS_EN.has(p)) en += 1;
-  }
-  if (es === en) return null;
-  return es > en ? 'es' : 'en';
 }
 
 function unaPregunta(op: Oportunidad): Verificacion {
