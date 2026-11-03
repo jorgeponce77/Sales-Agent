@@ -32,6 +32,9 @@ const LINEAS = ['WMS', 'TMS', 'PLANEACION_DEMANDA', 'VOICE'];
 
 const lista = (valores: string[]): string => valores.join(', ');
 
+/** Largo máximo de la fuente opcional de un criterio de Argano cumplido. */
+const MAX_FUENTE_CRITERIO = 200;
+
 /**
  * Revisa rangos, formas y valores de lista del expediente. Nunca lanza, ni con
  * elementos nulos ni con bloques faltantes: devuelve la lista de errores
@@ -186,6 +189,10 @@ export function validarExpediente(exp: Expediente): ErrorValidacion[] {
       return;
     }
     revisarLista(`${campo}.nivel`, raw['nivel'], NIVELES, false);
+    const fuente = raw['fuente'];
+    if (fuente !== undefined && (typeof fuente !== 'string' || fuente.length > MAX_FUENTE_CRITERIO)) {
+      error(`${campo}.fuente`, `La fuente debe ser texto de máximo ${MAX_FUENTE_CRITERIO} caracteres`);
+    }
   });
 
   // Acciones previas

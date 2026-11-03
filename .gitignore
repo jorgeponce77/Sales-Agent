@@ -1,2 +1,11 @@
 .superpowers/
 node_modules/
+dist/
+.env*
+.secrets/
+agente/evals/informes/
+.next/
+agente/dist-evals/
+web-pruebas/next-env.d.ts
+*.tsbuildinfo
+web-pruebas/e2e/*.png

@@ -111,6 +111,14 @@ describe('validarExpediente', () => {
       })).toEqual([]);
     });
 
+    it('fuente del criterio Argano (R9): opcional, texto de máximo 200 caracteres', () => {
+      expect(camposConError((e) => { e.criteriosArgano[0].fuente = 'vendedor: PR-123 aprobado por Ana'; })).toEqual([]);
+      expect(camposConError((e) => { e.criteriosArgano[0].fuente = 'x'.repeat(200); })).toEqual([]);
+      expect(camposConError((e) => { e.criteriosArgano[0].fuente = 'x'.repeat(201); })).toContain('criteriosArgano[0].fuente');
+      expect(camposConError((e) => { e.criteriosArgano[0].fuente = 42; })).toContain('criteriosArgano[0].fuente');
+      expect(camposConError((e) => { e.criteriosArgano[0].fuente = null; })).toContain('criteriosArgano[0].fuente');
+    });
+
     it('el mensaje de error está en español y nombra los valores válidos', () => {
       const exp = expedienteBase({ cadena: { ruta: 'OC' as never } });
       const err = validarExpediente(exp).find((x) => x.campo === 'cadena.ruta');

@@ -1,0 +1,12 @@
+export * from './tipos.js';
+export { validarFicha, convertirAUSD, fichaAExpediente, crearOportunidad } from './ficha.js';
+export { hoyEnMexico } from './fechas.js';
+export { idiomaDe, idiomaDelVendedor } from './idioma.js';
+export type { Idioma } from './idioma.js';
+export { crearClienteAnthropic, MODELO_DEFAULT } from './conversacion/cliente.js';
+export type { ClienteModelo, OpcionesCliente } from './conversacion/cliente.js';
+export { iniciarSesion, ejecutarTurno } from './conversacion/turno.js';
+export type { OpcionesTurno } from './conversacion/turno.js';
+export { formatearTranscripcion } from './conversacion/transcripcion.js';
+export { ESCENARIOS } from './escenarios/index.js';
+export type { Escenario } from './escenarios/index.js';

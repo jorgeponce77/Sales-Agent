@@ -35,7 +35,7 @@ export interface CadenaCierre {
   pasos: { aElegido: boolean; bContratoEnviado: boolean; cComentariosRecibidos: boolean;
            dEnFirma: boolean; eFirmado: boolean; fAltaProveedor: boolean; hOC: boolean };
 }
-export interface CriterioCumplido { clave: string; nivel: Nivel }
+export interface CriterioCumplido { clave: string; nivel: Nivel; fuente?: string }
 export interface AccionPrevia { que: string; quien: string; cuando: string; atiende: string; estado: 'abierta'|'cumplida'|'no_cumplida' }
 
 export interface Expediente {

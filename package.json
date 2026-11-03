@@ -1,0 +1,10 @@
+{
+  "name": "sales-agent",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["motor", "agente", "web-pruebas"],
+  "scripts": {
+    "build:paquetes": "npm run build -w motor-sales-agent -w agente-sales-agent",
+    "test": "npm run build:paquetes && npm test --workspaces --if-present"
+  }
+}
