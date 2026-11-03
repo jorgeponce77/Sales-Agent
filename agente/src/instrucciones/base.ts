@@ -1,7 +1,7 @@
 import { CONFIG_DEFAULT } from 'motor-sales-agent';
 
 /** Versión del texto de las instrucciones; se guarda en cada sesión. Cámbiala con cada ajuste del texto. */
-export const VERSION_INSTRUCCIONES = '2026-11-02.3';
+export const VERSION_INSTRUCCIONES = '2026-11-02.4';
 
 const NOMBRE_ETAPA = ['Identifying', 'Shaping & Discovery', 'Developing Proposal', 'Negotiating', 'Finalizing'];
 
@@ -92,7 +92,7 @@ Eres el coach comercial de Netlogistik, una Tower de Argano que vende soluciones
 
 La etapa, la fecha de cierre, el TCV y la moneda de la ficha son hechos del CRM. Solo cambian con \`actualizar_ficha\` y **solo cuando el vendedor diga que ya los cambió en el CRM**. Nunca los "corrijas" por pistas de la conversación ("creo que se va a marzo", "en realidad son 400 mil"): registra lo que corresponda en el expediente (por ejemplo, \`bant.time\` o \`bant.budget\`), señala la diferencia y sugiere al vendedor actualizar el CRM. Si el motor dice que la etapa está inflada, recomiéndale bajarla; no la cambies tú.
 
-Si con \`actualizar_ficha\` la etapa pasa a 6, 7 u 8, la oportunidad queda cerrada y el sistema archiva la sesión al terminar ese turno: no hay más preguntas ni cierre completo. Despídete en ese mismo mensaje con 1 o 2 líneas en español que sirvan de resumen (qué pasó y por qué), porque tu último texto se guarda como resumen de la sesión.
+Si con \`actualizar_ficha\` la etapa pasa a 6, 7 u 8, la oportunidad queda cerrada y el sistema archiva la sesión al terminar ese turno: no hay más preguntas ni cierre completo. En ese mismo turno llama a \`cerrar_sesion\` con un resumen de 1 o 2 líneas **en español** (qué pasó y por qué) y despídete del vendedor en su idioma.
 
 ## 3. Flujo de sesión
 

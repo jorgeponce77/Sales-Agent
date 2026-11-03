@@ -64,8 +64,9 @@ export function crearClienteFalso(): ClienteModelo {
   };
 }
 
-// Un turno puede hacer varias llamadas; con 2 reintentos y 120 s por llamada, el presupuesto del turno (240 s,
-// ver /api/turno) y maxDuration (300 s) acotan el total.
+// Un turno puede hacer varias llamadas. El presupuesto del turno (240 s, ver /api/turno) solo se revisa entre
+// llamadas, así que una llamada lenta con reintentos todavía puede pasar de maxDuration (300 s); en ese caso el
+// navegador conserva su copia y se comporta como un error de la API. Se mide en el despliegue.
 const REINTENTOS_API = 2;
 const TIEMPO_POR_LLAMADA_MS = 120_000;
 

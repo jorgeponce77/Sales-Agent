@@ -142,7 +142,7 @@ describe('construirInstrucciones', () => {
   });
 
   it('version', () => {
-    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.3');
+    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.4');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
   });
 });
