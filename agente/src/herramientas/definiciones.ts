@@ -58,7 +58,8 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     name: 'registrar_criterio_argano',
     description:
       'Registra el nivel de cumplimiento de criterios de Argano; cada clave reemplaza su nivel anterior, no acumula. ' +
-      'Úsala cuando el vendedor confirme, suponga o desconozca si un criterio se cumple. Dos formas: un criterio {clave, nivel, fuente?} ' +
+      'Úsala con los criterios de la etapa actual del CRM cuando el vendedor confirme, suponga o desconozca si se cumplen. ' +
+      'Los de etapas anteriores se dan por cumplidos: no los preguntes y regístralos (en "ausente") solo si el vendedor los contradice. Dos formas: un criterio {clave, nivel, fuente?} ' +
       'o un lote {criterios: [{clave, nivel, fuente?}, ...]} de 1 a 30 (registra los criterios de una etapa en una sola llamada). ' +
       'El lote es atómico: si un elemento es inválido no se registra ninguno y vuelven todos los errores. ' +
       'Los criterios internos de Argano/Netlogistik con nivel "confirmado" exigen fuente con la referencia verificable del vendedor ' +

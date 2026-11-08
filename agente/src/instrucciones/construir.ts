@@ -93,14 +93,31 @@ function lineaInfluencia(i: Influencia): string {
   return `- ${partes.join(' · ')}`;
 }
 
-/** Criterios de Argano aún no confirmados en las etapas que el CRM ya dice haber pasado. */
-function criteriosPendientes(exp: Expediente): string {
-  const confirmados = new Set(exp.criteriosArgano.filter((c) => c.nivel === 'confirmado').map((c) => c.clave));
-  const pendientes = CONFIG_DEFAULT.criteriosArgano
-    .filter((c) => c.etapaDesde < exp.etapaCRM && (!c.soloRFP || exp.esRFP) && !confirmados.has(c.clave))
+/**
+ * Criterios de Argano según la presunción por etapa: los de la etapa actual (lo que falta para avanzar), con su
+ * nivel, y las contradicciones registradas (`ausente`) en las etapas anteriores, que se dan por hechas.
+ */
+function lineasCriterios(exp: Expediente): string[] {
+  const aplica = (c: { soloRFP?: boolean }): boolean => !c.soloRFP || exp.esRFP;
+  const nivel = new Map(exp.criteriosArgano.map((c) => [c.clave, c.nivel]));
+  const actuales = CONFIG_DEFAULT.criteriosArgano
+    .filter((c) => c.etapaDesde === exp.etapaCRM && aplica(c))
+    .map((c) => `${c.clave} ${nivel.get(c.clave) ?? 'pendiente'}`);
+  const contradicciones = CONFIG_DEFAULT.criteriosArgano
+    .filter((c) => c.etapaDesde < exp.etapaCRM && aplica(c) && nivel.get(c.clave) === 'ausente')
     .map((c) => c.clave);
-  if (exp.etapaCRM === 0) return 'no aplica (etapa 0)';
-  return pendientes.length === 0 ? 'todos confirmados' : pendientes.join(', ');
+  const lineas = [
+    actuales.length > 0
+      ? `Criterios de Argano de la etapa actual (${exp.etapaCRM}, para avanzar): ${actuales.join(', ')}`
+      : `Criterios de Argano de la etapa actual (${exp.etapaCRM}): no aplica (falta el entregable de cierre si no está)`,
+  ];
+  if (exp.etapaCRM > 0) {
+    const previas = exp.etapaCRM === 1 ? 'Etapa 0' : `Etapas 0 a ${exp.etapaCRM - 1}`;
+    lineas.push(
+      `${previas}: se dan por hechas (no se preguntan) · contradicciones registradas: ${contradicciones.length > 0 ? contradicciones.join(', ') : 'ninguna'}`,
+    );
+  }
+  return lineas;
 }
 
 function bloqueExpediente(exp: Expediente, diag: Diagnostico): string[] {
@@ -129,7 +146,7 @@ function bloqueExpediente(exp: Expediente, diag: Diagnostico): string[] {
     `Prioridad: ${ev(exp.prioridad)} · Sensación del vendedor: ${exp.sensacion ?? '?'} · Reorganización: ${ev(exp.reorganizacion)}`,
     `Competencia: pregunta hecha ${siNo(exp.preguntaCompetenciaHecha)} · alternativas: ${alternativas.length > 0 ? alternativas.join('; ') : 'ninguna'} · contribución diferenciadora ${ev(exp.contribucionDiferenciadora)} · criterios de compra definidos ${siNo(exp.criteriosCompraDefinidos)}`,
     `Cadena de cierre: ruta ${cadena.ruta} · requiere SOW ${siNo(cadena.requiereSOW)} · pasos cumplidos: ${pasos.length > 0 ? pasos.join(', ') : 'ninguno'}`,
-    `Criterios de Argano sin confirmar (etapas anteriores a la del CRM): ${criteriosPendientes(exp)}`,
+    ...lineasCriterios(exp),
     `Higiene de CRM: valores ${siNo(exp.higieneCRM.valores)} · actividades ${siNo(exp.higieneCRM.actividades)} · etapas ${siNo(exp.higieneCRM.etapas)}`,
   ];
 }
