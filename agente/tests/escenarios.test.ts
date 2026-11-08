@@ -149,13 +149,22 @@ describe('escenarios: los hechos permiten llegar a lo que debe detectar el agent
 
   it('E1: etapa inflada, fecha no creíble y semáforo rojo', () => {
     const f = porId('E1').construirFicha(HOY);
-    const d = calcularDiagnostico(expedienteDeVerdad('E1', f, HOY), HOY);
+    const exp = expedienteDeVerdad('E1', f, HOY);
+    const d = calcularDiagnostico(exp, HOY);
     expect(d.lente).toBe('director');
+    // Presunción por etapa: sin contradicciones de etapas anteriores, la baja la pone el paso a (no elegidos): 4 → 3.
     expect(d.comparacionEtapa).toBe('inflada');
-    expect(d.etapaRecomendada).toBeLessThan(f.etapaCRM);
+    expect(d.etapaRecomendada).toBe(3);
     expect(d.fecha?.veredicto).toBe('no_cierra_periodo');
-    expect(d.banderas.map((b) => b.id)).toEqual(expect.arrayContaining(['etapa_inflada_grave', 'ce_urgencia_falsa']));
+    expect(d.banderas.map((b) => b.id)).toEqual(
+      expect.arrayContaining(['no_elegidos_cierre_periodo', 'etapa_inflada', 'ce_urgencia_falsa']),
+    );
     expect(d.indice.semaforo).toBe('rojo');
+    // Si en la conversación sale que delivery no ha refinado la estrategia (etapa 2), la inflación es grave.
+    exp.criteriosArgano.push({ clave: 'estrategia_delivery_refinada', nivel: 'ausente' });
+    const grave = calcularDiagnostico(exp, HOY);
+    expect(grave.etapaRecomendada).toBe(2);
+    expect(grave.banderas.map((b) => b.id)).toContain('etapa_inflada_grave');
   });
 
   it('E2: sin económico, una sola pata y BANT en supuesto', () => {
@@ -206,6 +215,8 @@ describe('escenarios: los hechos permiten llegar a lo que debe detectar el agent
     expect(d.indice.semaforo).toBe('verde');
     expect(d.banderas.filter((b) => b.severidad === 'critica')).toEqual([]);
     expect(d.comparacionEtapa).toBe('al_dia');
+    expect(d.etapaRecomendada).toBe(3);
+    expect(d.banderas.map((b) => b.id).filter((id) => id.startsWith('etapa_inflada'))).toEqual([]);
     expect(d.fecha?.veredicto).toBe('creible');
     expect(d.fecha?.rutaUsada).toBe('contrato');
     expect(d.fortalezas.map((x) => x.id)).toEqual(

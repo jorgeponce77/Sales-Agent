@@ -21,11 +21,12 @@ function normalizar(t: string): string {
     .trim();
 }
 
+/** Una sola pregunta por mensaje (instrucciones 2026-11-08.1): más de un "?" en un mensaje del agente falla. */
 function unaPregunta(op: Oportunidad): Verificacion {
-  const malos = mensajesDelAgente(op).filter((m) => (m.texto.match(/\?/g) ?? []).length > 2);
+  const malos = mensajesDelAgente(op).filter((m) => (m.texto.match(/\?/g) ?? []).length > 1);
   return malos.length === 0
-    ? { nombre: 'una_pregunta', ok: true, detalle: 'Ningún mensaje del agente tiene más de 2 "?".' }
-    : { nombre: 'una_pregunta', ok: false, detalle: `${malos.length} mensaje(s) con más de 2 "?"; el primero: "${recorte(malos[0]?.texto ?? '')}"` };
+    ? { nombre: 'una_pregunta', ok: true, detalle: 'Ningún mensaje del agente tiene más de un "?".' }
+    : { nombre: 'una_pregunta', ok: false, detalle: `${malos.length} mensaje(s) con más de un "?"; el primero: "${recorte(malos[0]?.texto ?? '')}"` };
 }
 
 function idioma(esc: Escenario, op: Oportunidad): Verificacion {
@@ -75,4 +76,19 @@ function banderasEsperadas(esc: Escenario, op: Oportunidad): Verificacion {
 /** Comprobaciones automáticas sobre la oportunidad resultante de una conversación simulada. */
 export function verificar(esc: Escenario, op: Oportunidad): Verificacion[] {
   return [unaPregunta(op), idioma(esc, op), sinPersonasInventadas(esc, op), cierreConDiagnostico(op), banderasEsperadas(esc, op)];
+}
+
+/** Señales de que un mensaje del agente da el diagnóstico del motor (semáforo o índice sobre 100), en español o inglés. */
+const DIAGNOSTICO = /sem[aá]foro|traffic light|\b\d{1,3}\s*\/\s*100\b/i;
+
+/**
+ * Informativo, nunca falla: cuántos mensajes del agente hubo hasta el primero que da el diagnóstico (incluido),
+ * contando las sesiones en orden. Sirve para ver si la conversación se alarga por preguntas redundantes.
+ */
+export function mensajesHastaDiagnostico(op: Oportunidad): Verificacion & { mensajes: number | null } {
+  const mensajes = mensajesDelAgente(op);
+  const i = mensajes.findIndex((m) => DIAGNOSTICO.test(m.texto));
+  return i < 0
+    ? { nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: null, detalle: `No se encontró el diagnóstico en los ${mensajes.length} mensajes del agente.` }
+    : { nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: i + 1, detalle: `${i + 1} mensaje(s) del agente hasta el diagnóstico (de ${mensajes.length}).` };
 }

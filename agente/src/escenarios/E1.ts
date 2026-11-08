@@ -49,16 +49,16 @@ BANT:
 COMPELLING EVENT: no hay un evento con fecha fija, dueño y costo de la inacción. Héctor comenta que quisieran "arrancar antes de la temporada alta", sin fecha concreta, y nadie cuantificó lo que cuesta no actuar. La única urgencia con fecha es la tuya: ofreciste un descuento si firman antes de la fecha de cierre del CRM. Si el agente pregunta si hay un descuento por cerrar, lo admites. Sobre la fecha del cliente no tienes más datos.
 
 CADENA DE CIERRE (responde solo a lo que te pregunten):
-- a. ¿El cliente comunicó que somos el proveedor elegido? Lo dices con entusiasmo, y solo si el agente insiste en quién lo dijo y si tiene facultad para adjudicar, admites que fue Héctor de palabra, que no hay correo ni carta del comité y que el comité todavía no decide.
+- a. ¿El cliente comunicó que somos el proveedor elegido? Dices con entusiasmo que sí y, en la misma respuesta, de dónde viene: Héctor te dijo "ustedes son mi opción" hace unos 45 días. Si el agente nota que Héctor no decide (lo decide el comité) o te pregunta si el comité o Patricia ya lo comunicaron, admites que no: fue Héctor de palabra, no hay correo ni carta del comité y el comité todavía no decide.
 - b a e: el contrato no se ha enviado (tienes un borrador); no hay comentarios del cliente; nada en firma. El negocio sí requiere SOW firmado. No sabes si compras emitirá orden de compra ni en qué orden; supones que primero va el contrato.
 - f: Montealto es cliente nuevo; el alta de Netlogistik como proveedor no se ha iniciado y no has enviado documentos fiscales. h: no hay orden de compra.
 
-CRITERIOS DE ARGANO (dilo cuando el agente pregunte criterio por criterio):
+CRITERIOS DE ARGANO (el agente no debería preguntarte por las etapas 0 a 3: la etapa 4 del CRM ya implica que ocurrieron. Esta es la verdad por si el tema sale en la conversación, por ejemplo al hablar del descuento, del precio, del arranque o del equipo de delivery; entonces la dices con honestidad):
 - Etapa 0 cumplida: la fuente fue un lead entrante tras un evento de logística; el cliente confirmó que el proyecto es real (correo de Héctor); alineada con la estrategia (la aprobó tu gerente, Sergio Urrutia, hace unos cinco meses).
 - Etapa 1 cumplida: entiendes los dolores (visita al CD con Héctor); volumen y presupuesto aproximados conocidos; la aprobación de presupuesto del lado del cliente la sustentas en el correo de Héctor de hace unos dos meses ("el presupuesto ya está"), sin documento de Finanzas; la revisión interna de calificación de Argano la aprobó Sergio Urrutia hace unos cuatro meses; el business case del cliente es reducir errores de surtido y horas extra; el cliente pidió una propuesta formal por correo.
 - Etapa 2: propuesta desarrollada (versión 3, entregada hace unas siete semanas), requerimientos refinados y recursos y presupuesto evaluados: sí. Estrategia de delivery refinada con los SMEs: NO, solo hubo una llamada de media hora con Lorena Fierro, de delivery, que no ha revisado el plan de arranque ni confirmado equipo. Revenue, equipo y calendario definidos: NO.
 - Etapa 3: propuesta entregada: sí. Forecast actualizado: sí (lo dejaste en 85%). Aprobación interna de recursos, tiempos y margen: NO (pediste 12% de descuento y no hay aprobación). PR aprobado: NO (el PR-2026-0187 está capturado, sin aprobador). SOW y precios finalizados con el cliente: NO. Staffing request: NO.
-- Etapa 4: nada cumplido (sin acuerdo escrito del cliente, sin fecha de inicio, sin demand signal, SOW sin enviar a firma).
+- Etapa 4 (la actual): nada cumplido (sin acuerdo escrito del cliente, sin fecha de inicio, sin demand signal, SOW sin enviar a firma).
 
 HIGIENE DEL CRM: valores NO (el TCV cambió al pedir el descuento y el CRM sigue con el monto anterior); actividades NO (no registraste las reuniones de las últimas semanas); etapas NO (tú subiste la etapa a 4 por el comentario de Héctor). Sin presión del agente dices que "más o menos al día".
 

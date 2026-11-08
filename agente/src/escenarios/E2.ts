@@ -35,7 +35,7 @@ COMPELLING EVENT: no sabes de ninguno. Ni fecha, ni dueño, ni costo de la inacc
 
 CADENA DE CIERRE: el cliente no ha dicho que seamos el proveedor elegido; no se ha enviado contrato. No sabes si requiere SOW ni si compran con contrato u orden de compra. No sabes del alta de proveedor.
 
-CRITERIOS DE ARGANO:
+CRITERIOS DE ARGANO (el agente no debería preguntarte por las etapas 0 y 1: la etapa 2 del CRM ya implica que ocurrieron. Esta es la verdad por si el tema sale; entonces respondes con estos datos, a tu manera):
 - Etapa 0 cumplida: lead referido por un cliente de la región (fuente creíble); Quintero confirmó que el proyecto es real; alineada con la estrategia (la aprobó tu gerente, Andrés Mejía, hace unos tres meses).
 - Etapa 1: entiende cliente y dolores: solo con la visión de Quintero (parcial); volumen aproximado: sí, unas 120 entregas diarias; presupuesto aproximado: NO; revisión de calificación y presupuesto del cliente: NO; business case del cliente: NO; Quintero sí pidió una propuesta.
 - Etapa 2: propuesta desarrollada (versión 1, enviada hace unas seis semanas): sí; los demás criterios de la etapa no los has trabajado.

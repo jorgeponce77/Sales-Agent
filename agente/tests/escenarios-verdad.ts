@@ -1,4 +1,4 @@
-import { CONFIG_DEFAULT, sumarDiasNaturales } from 'motor-sales-agent';
+import { sumarDiasNaturales } from 'motor-sales-agent';
 import type { CriterioCumplido, Evidencia, Expediente, Influencia, Nivel } from 'motor-sales-agent';
 import { fichaAExpediente } from '../src/ficha.js';
 import type { Ficha } from '../src/tipos.js';
@@ -22,16 +22,17 @@ function inf(base: Partial<Influencia> & Pick<Influencia, 'personaId' | 'nombre'
   };
 }
 
-/** Criterios de Argano confirmados de las etapas anteriores a `hasta`, menos los de `excepto`. */
-function criteriosHasta(hasta: number, esRFP: boolean, excepto: string[] = [], extra: string[] = []): CriterioCumplido[] {
-  const claves = CONFIG_DEFAULT.criteriosArgano
-    .filter((c) => c.etapaDesde < hasta && (!c.soloRFP || esRFP) && !excepto.includes(c.clave))
-    .map((c) => c.clave);
-  return [...claves, ...extra].map((clave) => ({ clave, nivel: 'confirmado', fuente: 'vendedor: referencia del escenario' }));
-}
+// Presunción por etapa (2026-11-08): el agente no pregunta los criterios de las etapas anteriores a la del CRM
+// (el motor los presume cumplidos). Aquí solo se registran los de la etapa actual que el vendedor cuenta y las
+// contradicciones (`ausente`) que salen en la conversación.
 
 function criterios(claves: string[]): CriterioCumplido[] {
   return claves.map((clave) => ({ clave, nivel: 'confirmado', fuente: 'vendedor: referencia del escenario' }));
+}
+
+/** Contradicciones dichas por el vendedor: criterios en `ausente`. */
+function contradicciones(claves: string[]): CriterioCumplido[] {
+  return claves.map((clave) => ({ clave, nivel: 'ausente' }));
 }
 
 type Id = 'E1' | 'E2' | 'E3' | 'E4' | 'E5';
@@ -68,10 +69,8 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         ruta: 'contrato', requiereSOW: true,
         pasos: { aElegido: false, bContratoEnviado: false, cComentariosRecibidos: false, dEnFirma: false, eFirmado: false, fAltaProveedor: false, hOC: false },
       };
-      exp.criteriosArgano = [
-        ...criteriosHasta(2, false),
-        ...criterios(['propuesta_desarrollada', 'requerimientos_refinados', 'recursos_presupuesto_evaluados', 'propuesta_entregada', 'forecast_actualizado']),
-      ];
+      // Etapa actual (4): nada cumplido. Las etapas 0 a 3 se presumen; la etapa la baja el paso a (no elegidos).
+      exp.criteriosArgano = contradicciones(['acuerdo_cliente', 'fecha_inicio_confirmada', 'demand_signal_confirmado', 'sow_enviado_firma']);
       exp.higieneCRM = { valores: false, actividades: false, etapas: false };
       break;
     }
@@ -91,10 +90,8 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         need: ev('Fletes caros, rutas en Excel, sin trazabilidad', 'confirmado', hace(21)),
         time: ev('Cierre según el ciclo', 'supuesto', hace(1)),
       };
-      exp.criteriosArgano = [
-        ...criteriosHasta(1, false),
-        ...criterios(['confirma_recibir_propuesta', 'propuesta_desarrollada']),
-      ];
+      // Etapa actual (2): solo la propuesta desarrollada. Las etapas 0 y 1 se presumen.
+      exp.criteriosArgano = criterios(['propuesta_desarrollada']);
       exp.higieneCRM = { valores: true, actividades: null, etapas: false };
       break;
     }
@@ -116,10 +113,11 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         need: ev('Inventarios descuadrados y software viejo (anexo técnico)', 'supuesto', hace(25)),
         time: ev('Calendario de la licitación', 'confirmado', hace(25)),
       };
-      exp.criteriosArgano = criterios([
-        'fuente_creible', 'cliente_confirma_real', 'alineada_estrategia_argano',
-        'volumen_presupuesto_aprox', 'aprobacion_calificacion_presupuesto_cliente', 'rfp_analizado', 'confirma_recibir_propuesta',
-      ]);
+      // Etapa actual (1). La etapa 0 se presume.
+      exp.criteriosArgano = [
+        ...criterios(['volumen_presupuesto_aprox', 'aprobacion_calificacion_presupuesto_cliente', 'rfp_analizado', 'confirma_recibir_propuesta']),
+        ...contradicciones(['entiende_cliente_dolores', 'business_case_identificado']),
+      ];
       exp.cadena = { ...exp.cadena, ruta: 'contrato', requiereSOW: true };
       exp.higieneCRM = { valores: true, actividades: true, etapas: true };
       break;
@@ -150,9 +148,11 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         fecha: ausente(), dueno: ev('Sergio Paredes', 'supuesto', hace(2)), costoInaccion: ev('Cerca del 30% de los ingresos', 'supuesto', hace(14)),
         urgenciaFalsa: false,
       };
+      // Etapa actual (2): propuesta desarrollada. Contradicción de la etapa 1 que sale con el presupuesto:
+      // el cliente no ha aprobado presupuesto para esta propuesta (la partida es del piloto de TI).
       exp.criteriosArgano = [
-        ...criteriosHasta(2, false, ['aprobacion_calificacion_presupuesto_cliente']),
         ...criterios(['propuesta_desarrollada']),
+        ...contradicciones(['aprobacion_calificacion_presupuesto_cliente', 'requerimientos_refinados']),
       ];
       exp.higieneCRM = { valores: true, actividades: false, etapas: true };
       break;
@@ -193,9 +193,10 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         ruta: 'ambas_oc_tras_contrato', requiereSOW: true,
         pasos: { aElegido: true, bContratoEnviado: false, cComentariosRecibidos: false, dEnFirma: false, eFirmado: false, fAltaProveedor: true, hOC: false },
       };
+      // Etapa actual (3): los cumplidos con su referencia y los dos pendientes. Las etapas 0 a 2 se presumen.
       exp.criteriosArgano = [
-        ...criteriosHasta(3, false),
         ...criterios(['aprobacion_interna_recursos_margen', 'pr_aprobado', 'propuesta_entregada', 'forecast_actualizado']),
+        ...contradicciones(['sow_precios_finalizados', 'staffing_request']),
       ];
       exp.higieneCRM = { valores: true, actividades: true, etapas: true };
       break;
