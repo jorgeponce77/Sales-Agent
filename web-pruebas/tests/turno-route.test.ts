@@ -322,6 +322,28 @@ describe('hora local para el saludo', () => {
     await llamar({ accion: 'mensaje', oportunidad: primera.json.oportunidad, mensaje: 'hola' });
     expect(vi.mocked(ejecutarTurno).mock.calls[0]?.[2]).toMatchObject({ horaLocal: 20 });
   });
+
+  it('con zonaHoraria válida del navegador usa la hora de esa zona y no la del país de la ficha', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-08T12:00:00Z'));
+    try {
+      vi.mocked(horaLocalPorPais).mockReturnValue(3);
+      const { estado } = await llamar({ accion: 'iniciar', ficha: fichaBase({ pais: 'CO' }), zonaHoraria: 'Asia/Tokyo' });
+      expect(estado).toBe(200);
+      expect(vi.mocked(iniciarSesion).mock.calls[0]?.[2]).toMatchObject({ horaLocal: 21 });
+      expect(vi.mocked(horaLocalPorPais)).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([['Zona/Inventada'], [''], ['A'.repeat(65)], [42], [null]])('con zonaHoraria inválida (%j) cae a la del país de la ficha', async (zona) => {
+    vi.mocked(horaLocalPorPais).mockReturnValue(9);
+    const { estado } = await llamar({ accion: 'iniciar', ficha: fichaBase({ pais: 'CO' }), zonaHoraria: zona });
+    expect(estado).toBe(200);
+    expect(vi.mocked(horaLocalPorPais)).toHaveBeenCalledWith('CO');
+    expect(vi.mocked(iniciarSesion).mock.calls[0]?.[2]).toMatchObject({ horaLocal: 9 });
+  });
 });
 
 describe('diagnóstico', () => {

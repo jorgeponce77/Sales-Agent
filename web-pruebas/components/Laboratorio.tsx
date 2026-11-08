@@ -85,6 +85,15 @@ async function copiarAlPortapapeles(obtener: () => Promise<string>): Promise<voi
   await navigator.clipboard.writeText(await conTexto());
 }
 
+/** Zona horaria del navegador (para que el saludo use la hora del vendedor); undefined si no se puede leer. */
+function zonaDelNavegador(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 interface Aviso { tipo: 'error' | 'info'; texto: string }
 
 /** ¿La pantalla es de escritorio (900 px o más)? Empieza en false para que el servidor y el cliente coincidan. */
@@ -166,7 +175,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
     setOcupado(true);
     setAviso(null);
     try {
-      const r = await llamar('/api/turno', cuerpo);
+      const r = await llamar('/api/turno', { ...cuerpo, zonaHoraria: zonaDelNavegador() });
       if (!r.ok) {
         setAviso({ tipo: 'error', texto: r.mensaje });
         return null;
