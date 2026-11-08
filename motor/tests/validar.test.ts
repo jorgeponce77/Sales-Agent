@@ -119,6 +119,13 @@ describe('validarExpediente', () => {
       expect(camposConError((e) => { e.criteriosArgano[0].fuente = null; })).toContain('criteriosArgano[0].fuente');
     });
 
+    it('etapaRegistro del criterio Argano: opcional, entero de 0 a 8', () => {
+      for (const ok of [0, 3, 8]) expect(camposConError((e) => { e.criteriosArgano[0].etapaRegistro = ok; })).toEqual([]);
+      for (const malo of [-1, 9, 2.5, '3', null]) {
+        expect(camposConError((e) => { e.criteriosArgano[0].etapaRegistro = malo; })).toContain('criteriosArgano[0].etapaRegistro');
+      }
+    });
+
     it('el mensaje de error está en español y nombra los valores válidos', () => {
       const exp = expedienteBase({ cadena: { ruta: 'OC' as never } });
       const err = validarExpediente(exp).find((x) => x.campo === 'cadena.ruta');

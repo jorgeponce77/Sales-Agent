@@ -232,7 +232,10 @@ export const registrarCriterioArgano: Herramienta = segura('registrar_criterio_a
   const descripcion = `${esLote ? 'Criterios de Argano' : 'Criterio de Argano'}: ${criterios.map(describirCriterio).join('; ')}`;
 
   return aplicarEscritura(estado, descripcion, (exp) => {
-    for (const nuevo of criterios) {
+    // La etapa del CRM al registrar: con ella el motor distingue un "no sé" de la etapa en curso (que no
+    // infla la etapa cuando el CRM sube) de una contradicción de una etapa ya pasada.
+    for (const sinEtapa of criterios) {
+      const nuevo: CriterioCumplido = { ...sinEtapa, etapaRegistro: exp.etapaCRM };
       const i = exp.criteriosArgano.findIndex((c) => c.clave === nuevo.clave);
       if (i >= 0) exp.criteriosArgano[i] = nuevo;
       else exp.criteriosArgano.push(nuevo);
@@ -281,6 +284,8 @@ export const registrarInfluencia: Herramienta = segura('registrar_influencia', (
     }
 
     if (existente) {
+      // Con personaId, un nombre distinto lo reemplaza (p. ej. "<cargo> (nombre pendiente)" → el nombre real).
+      if (typeof personaId === 'string' && typeof nombre === 'string' && existente.personaId === personaId) existente.nombre = nombre;
       for (const k of cambios) (existente as unknown as Obj)[k] = input[k];
       return;
     }

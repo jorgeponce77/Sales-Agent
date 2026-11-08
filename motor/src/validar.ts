@@ -193,6 +193,10 @@ export function validarExpediente(exp: Expediente): ErrorValidacion[] {
     if (fuente !== undefined && (typeof fuente !== 'string' || fuente.length > MAX_FUENTE_CRITERIO)) {
       error(`${campo}.fuente`, `La fuente debe ser texto de máximo ${MAX_FUENTE_CRITERIO} caracteres`);
     }
+    const etapaRegistro = raw['etapaRegistro'];
+    if (etapaRegistro !== undefined && (!Number.isInteger(etapaRegistro) || (etapaRegistro as number) < 0 || (etapaRegistro as number) > 8)) {
+      error(`${campo}.etapaRegistro`, 'La etapa de registro debe ser un entero de 0 a 8');
+    }
   });
 
   // Acciones previas

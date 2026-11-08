@@ -98,6 +98,14 @@ describe('verificar: sin_personas_inventadas', () => {
     expect(por(E1, conInfluencia('hector salgado villanueva'), 'sin_personas_inventadas').ok).toBe(true);
   });
 
+  it('una persona registrada por cargo "(nombre pendiente)" pasa si el cargo está en los hechos (revisión 3)', () => {
+    expect(por(E1, conInfluencia('Director de Compras (nombre pendiente)'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(E1, conInfluencia('director de compras (Nombre Pendiente)'), 'sin_personas_inventadas').ok).toBe(true);
+    const v = por(E1, conInfluencia('Director de Marketing (nombre pendiente)'), 'sin_personas_inventadas');
+    expect(v.ok).toBe(false);
+    expect(v.detalle).toContain('Director de Marketing (nombre pendiente)');
+  });
+
   it('sin influencias pasa', () => {
     expect(por(E1, opCon([msg('agente', ES)]), 'sin_personas_inventadas').ok).toBe(true);
   });
@@ -158,7 +166,7 @@ describe('informativo: mensajes_hasta_diagnostico', () => {
       msg('agente', '¿Quién firma?'),
       msg('vendedor', 'La CFO.'),
       msg('agente', 'Semáforo ámbar, índice 58/100: la etapa está al día.'),
-      msg('agente', 'Otro mensaje con semáforo.'),
+      msg('agente', 'Otro mensaje con semáforo e índice.'),
     ]);
     const v = mensajesHastaDiagnostico(op);
     expect(v).toMatchObject({ nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: 3 });
@@ -168,6 +176,15 @@ describe('informativo: mensajes_hasta_diagnostico', () => {
   it('reconoce el diagnóstico en inglés', () => {
     const op = opCon([msg('agente', 'Good morning!'), msg('agente', 'Traffic light: green, index 82/100.')]);
     expect(mensajesHastaDiagnostico(op).mensajes).toBe(2);
+  });
+
+  it('exige semáforo e índice en el mismo mensaje: mencionar solo el semáforo no cuenta (revisión 9)', () => {
+    const op = opCon([
+      msg('agente', 'Hoy el semáforo está en rojo por el presupuesto; ¿quién lo libera?'),
+      msg('agente', 'El índice de madurez quedó en 35.'),
+      msg('agente', 'Diagnóstico: semáforo rojo, índice 35/100.'),
+    ]);
+    expect(mensajesHastaDiagnostico(op).mensajes).toBe(3);
   });
 
   it('sin diagnóstico en la conversación no falla: lo informa', () => {

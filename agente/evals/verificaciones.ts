@@ -48,7 +48,11 @@ function idioma(esc: Escenario, op: Oportunidad): Verificacion {
 function sinPersonasInventadas(esc: Escenario, op: Oportunidad): Verificacion {
   // Con espacios alrededor, la comparación es por palabras completas: "Ana" no coincide con "semana".
   const hechos = ` ${normalizar(esc.hechosOcultos)} `;
-  const inventadas = op.expediente.influencias.map((i) => i.nombre).filter((n) => !hechos.includes(` ${normalizar(n)} `));
+  // Una persona registrada por cargo ("<cargo> (nombre pendiente)", regla 5) pasa si el cargo está en los hechos.
+  const comparable = (n: string): string => n.replace(/\(\s*nombre pendiente\s*\)\s*$/i, '');
+  const inventadas = op.expediente.influencias
+    .map((i) => i.nombre)
+    .filter((n) => !hechos.includes(` ${normalizar(comparable(n))} `));
   return inventadas.length === 0
     ? { nombre: 'sin_personas_inventadas', ok: true, detalle: 'Todas las personas registradas aparecen en los hechos.' }
     : { nombre: 'sin_personas_inventadas', ok: false, detalle: `Personas que no están en los hechos: ${inventadas.join(', ')}.` };
@@ -78,16 +82,20 @@ export function verificar(esc: Escenario, op: Oportunidad): Verificacion[] {
   return [unaPregunta(op), idioma(esc, op), sinPersonasInventadas(esc, op), cierreConDiagnostico(op), banderasEsperadas(esc, op)];
 }
 
-/** Señales de que un mensaje del agente da el diagnóstico del motor (semáforo o índice sobre 100), en español o inglés. */
-const DIAGNOSTICO = /sem[aá]foro|traffic light|\b\d{1,3}\s*\/\s*100\b/i;
+/** Señales del diagnóstico del motor en un mensaje del agente: el semáforo y el índice, en español o inglés. */
+const SEMAFORO = /sem[aá]foro|traffic light/i;
+const INDICE = /[ií]ndice|\bindex\b|\b\d{1,3}\s*\/\s*100\b/i;
 
 /**
  * Informativo, nunca falla: cuántos mensajes del agente hubo hasta el primero que da el diagnóstico (incluido),
  * contando las sesiones en orden. Sirve para ver si la conversación se alarga por preguntas redundantes.
+ * Criterio: el primer mensaje del agente que nombra el semáforo y el índice a la vez (el diagnóstico de §3.5 da
+ * los dos). No se usa la llamada a `calcular_diagnostico` porque las sesiones archivadas solo guardan la
+ * transcripción, sin las herramientas.
  */
 export function mensajesHastaDiagnostico(op: Oportunidad): Verificacion & { mensajes: number | null } {
   const mensajes = mensajesDelAgente(op);
-  const i = mensajes.findIndex((m) => DIAGNOSTICO.test(m.texto));
+  const i = mensajes.findIndex((m) => SEMAFORO.test(m.texto) && INDICE.test(m.texto));
   return i < 0
     ? { nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: null, detalle: `No se encontró el diagnóstico en los ${mensajes.length} mensajes del agente.` }
     : { nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: i + 1, detalle: `${i + 1} mensaje(s) del agente hasta el diagnóstico (de ${mensajes.length}).` };

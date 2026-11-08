@@ -92,7 +92,8 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     name: 'registrar_influencia',
     description:
       'Crea o actualiza una Influencia (persona del cliente) con su rol, grado, modo, calificación, contacto y Triunfo-Resultado. ' +
-      'Úsala cuando el vendedor mencione a una persona de la cuenta o cambie algo de ella. Si ya existe (mismo personaId o nombre), solo se actualizan los campos que envíes. ' +
+      'Úsala cuando el vendedor mencione a una persona de la cuenta o cambie algo de ella. Si ya existe (mismo personaId o nombre), solo se actualizan los campos que envíes; con personaId, un nombre nuevo reemplaza al anterior. ' +
+      'Si el vendedor no sabe el nombre, regístrala por cargo: "<cargo> (nombre pendiente)". ' +
       'Roles: E Económico, U Usuario, T Técnico, C Coach. Grado: A alto, M medio, B bajo. Modo: C Crecimiento, P Problema, E Equilibrio, EC Exceso de confianza. ' +
       'La calificación es un entero de -5 a -1 o de 1 a 5 (el 0 no existe).',
     input_schema: {
@@ -118,7 +119,8 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     description:
       'Registra una alternativa a la compra (otro proveedor, solución interna, presupuesto en otra cosa o no hacer nada) y su posición; ' +
       'también marca que la pregunta de competencia ya se hizo. Úsala cuando el vendedor diga contra qué o quién compite la oportunidad. ' +
-      'Si dice que no hay competencia, antes de registrar pregunta si hay una solución interna, si el presupuesto se podría ir a otra cosa y si el cliente podría no hacer nada; ' +
+      'Si dice que no hay competencia, antes de registrar haz una sola pregunta por las demás alternativas (solución interna, presupuesto en otra cosa, no hacer nada): ' +
+      '"¿El cliente podría resolverlo en casa, usar ese dinero en otro proyecto o no hacer nada?"; ' +
       'registra la que exista con su tipo y posición. Registra "no_hacer_nada" con posición "nula" solo si de verdad no hay alternativa de ningún tipo. ' +
       'Para el motor la posición general es la peor de las alternativas registradas, y es Nula si no hay ninguna (con la pregunta hecha) o si todas están en nula. ' +
       'Si ya existe (mismo tipo y nombre), actualiza su posición.',

@@ -1,4 +1,4 @@
-import { CATALOGO_REGLAS, CONFIG_DEFAULT, construirContexto } from 'motor-sales-agent';
+import { CATALOGO_REGLAS, CONFIG_DEFAULT, construirContexto, contradiccionesPrevias } from 'motor-sales-agent';
 import type { Diagnostico, Evidencia, Expediente, Influencia } from 'motor-sales-agent';
 import type { ModoSesion, Oportunidad } from '../tipos.js';
 import { saludoPorHora } from '../fechas.js';
@@ -103,9 +103,8 @@ function lineasCriterios(exp: Expediente): string[] {
   const actuales = CONFIG_DEFAULT.criteriosArgano
     .filter((c) => c.etapaDesde === exp.etapaCRM && aplica(c))
     .map((c) => `${c.clave} ${nivel.get(c.clave) ?? 'pendiente'}`);
-  const contradicciones = CONFIG_DEFAULT.criteriosArgano
-    .filter((c) => c.etapaDesde < exp.etapaCRM && aplica(c) && nivel.get(c.clave) === 'ausente')
-    .map((c) => c.clave);
+  // Solo contradicciones reales: un "no sé" registrado con el CRM en esa misma etapa no cuenta (motor).
+  const contradicciones = contradiccionesPrevias(exp, CONFIG_DEFAULT);
   const lineas = [
     actuales.length > 0
       ? `Criterios de Argano de la etapa actual (${exp.etapaCRM}, para avanzar): ${actuales.join(', ')}`
@@ -192,12 +191,14 @@ function bloqueSesiones(op: Oportunidad): string[] {
   ];
 }
 
+const SALUDO_EN = { 'buenos días': 'Good morning', 'buenas tardes': 'Good afternoon', 'buenas noches': 'Good evening' } as const;
+
 /** Línea de hora local y saludo para la apertura; sin una hora válida (entero 0–23), saludo neutro. */
 function lineaHoraLocal(horaLocal: number | undefined): string {
   if (horaLocal === undefined || !Number.isInteger(horaLocal) || horaLocal < 0 || horaLocal > 23) {
-    return 'Hora local del vendedor: desconocida → saludo neutro ("Hola, …")';
+    return 'Hora local del vendedor: desconocida → saludo neutro ("Hola, …"; en inglés, "Hi, …")';
   }
-  return `Hora local del vendedor: ${String(horaLocal).padStart(2, '0')} h → saludo: ${saludoPorHora(horaLocal)}`;
+  return `Hora local del vendedor: ${String(horaLocal).padStart(2, '0')} h → saludo: ${saludoPorHora(horaLocal)} (en inglés: ${SALUDO_EN[saludoPorHora(horaLocal)]})`;
 }
 
 /**

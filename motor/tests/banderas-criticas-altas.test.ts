@@ -268,6 +268,21 @@ describe('condiciones de borde', () => {
     expect(evaluar('etapa_inflada', exp)).toBeNull();
   });
 
+  it('texto de etapa inflada cuando la causa es solo que el cliente no nos ha elegido (revisión 7)', () => {
+    const porElegido = evaluar('etapa_inflada', expedienteBase({ etapaCRM: 4, cadena: { pasos: { aElegido: false } } }));
+    expect(porElegido).toMatch(/no nos ha elegido/);
+    expect(porElegido).not.toMatch(/sostienen los criterios/);
+    const graveElegido = evaluar('etapa_inflada_grave', expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: false } } }));
+    expect(graveElegido).toMatch(/no nos ha elegido/);
+    expect(graveElegido).not.toMatch(/sostienen los criterios/);
+    // Por criterios contradichos, el texto sigue hablando de criterios.
+    const porCriterios = evaluar('etapa_inflada', expedienteBase({ etapaCRM: 1, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] }));
+    expect(porCriterios).toMatch(/sostienen los criterios/);
+    // CRM 5 elegido pero sin OC ni contrato firmado: el texto lo dice.
+    const sinEntregable = evaluar('etapa_inflada', expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: true } } }));
+    expect(sinEntregable).toMatch(/orden de compra ni contrato firmado/);
+  });
+
   it('banco_una_pata_no_se_activa_sin_contactadas', () => {
     expect(evaluar('banco_una_pata', expedienteBase({ influencias: [influenciaBase({ contactada: false })] }))).toBeNull();
   });

@@ -35,7 +35,11 @@ export interface CadenaCierre {
   pasos: { aElegido: boolean; bContratoEnviado: boolean; cComentariosRecibidos: boolean;
            dEnFirma: boolean; eFirmado: boolean; fAltaProveedor: boolean; hOC: boolean };
 }
-export interface CriterioCumplido { clave: string; nivel: Nivel; fuente?: string }
+export interface CriterioCumplido {
+  clave: string; nivel: Nivel; fuente?: string;
+  /** Etapa del CRM (0–8) cuando se registró; con ella un `ausente` previo a esa etapa no cuenta como contradicción. */
+  etapaRegistro?: number;
+}
 export interface AccionPrevia { que: string; quien: string; cuando: string; atiende: string; estado: 'abierta'|'cumplida'|'no_cumplida' }
 
 export interface Expediente {

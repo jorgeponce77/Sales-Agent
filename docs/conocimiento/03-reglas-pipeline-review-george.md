@@ -54,7 +54,7 @@ Es una cadena secuencial. Cada paso que todavía no está cumplido suma días a 
 - **d = sí** (en firma) → coherente con la etapa 4 (SOW enviado a firma).
 - **e = sí** (firmado) → corresponde a la etapa 5 (Won). Los pasos f–h son lo que falta para facturar.
 
-**Presunción por etapa (George, 8-nov-2026).** La etapa del CRM implica que lo de las etapas anteriores ya ocurrió (actividades, entregables y acciones del cliente): no se pregunta ni se valida. Solo si el vendedor dice algo que lo contradice se registra (criterio en ausente) y la etapa recomendada baja; la etapa actual y las siguientes sí exigen criterios confirmados. Se mantienen las compuertas duras: la 4 exige que el cliente nos haya elegido (paso a) y la 5, OC o contrato firmado.
+**Presunción por etapa (George, 8-nov-2026).** La etapa del CRM implica que lo de las etapas anteriores ya ocurrió (actividades, entregables y acciones del cliente): no se pregunta ni se valida. Solo si el vendedor dice algo que lo contradice se registra (criterio en ausente) y la etapa recomendada baja (un "no sé" registrado mientras el CRM estaba en esa misma etapa no cuenta como contradicción cuando el CRM sube); la etapa actual y las siguientes sí exigen criterios confirmados. Se mantienen las compuertas duras: la 4 exige que el cliente nos haya elegido (paso a) y la 5, OC o contrato firmado.
 
 ### Criterio de cierre en el CRM (George, 31-oct-2026)
 

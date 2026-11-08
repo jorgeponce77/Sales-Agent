@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CONFIG_DEFAULT } from '../src/config.js';
-import { compararEtapa, entregableCierre, etapaRecomendada } from '../src/etapa.js';
+import { compararEtapa, contradiccionesPrevias, entregableCierre, esContradiccion, etapaRecomendada } from '../src/etapa.js';
 import type { CriterioCumplido, Nivel } from '../src/tipos.js';
 import { expedienteBase } from './fabrica.js';
 
@@ -119,11 +119,78 @@ describe('etapaRecomendada — presunción por etapa (George, 8-nov-2026)', () =
     expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(3);
   });
 
+  it('ausente_registrado_con_el_crm_en_esa_etapa_no_es_contradiccion_al_subir (revisión 1)', () => {
+    // "No sé" sobre staffing_request registrado con el CRM en 3; luego el CRM sube a 4 con proveedor elegido.
+    const exp = expedienteBase({
+      etapaCRM: 4,
+      cadena: { pasos: { aElegido: true } },
+      criteriosArgano: [{ clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 3 }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(4);
+  });
+
+  it('ausente_registrado_con_el_crm_ya_pasada_esa_etapa_si_es_contradiccion', () => {
+    const exp = expedienteBase({
+      etapaCRM: 4,
+      cadena: { pasos: { aElegido: true } },
+      criteriosArgano: [{ clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 4 }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(3);
+  });
+
+  it('ausente_sin_etapaRegistro_cuenta_como_contradiccion (datos anteriores)', () => {
+    const exp = expedienteBase({
+      etapaCRM: 3,
+      criteriosArgano: [{ clave: 'business_case_identificado', nivel: 'ausente' }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(1);
+  });
+
+  it('ausente_de_etapa_1_registrado_en_crm_1_no_baja_un_crm_3', () => {
+    const exp = expedienteBase({
+      etapaCRM: 3,
+      criteriosArgano: [{ clave: 'business_case_identificado', nivel: 'ausente', etapaRegistro: 1 }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(3);
+  });
+
+  it('firmado_u_oc_implican_proveedor_elegido (revisión 6)', () => {
+    const firmado = expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: false, eFirmado: true } } });
+    expect(etapaRecomendada(firmado, CONFIG_DEFAULT)).toBe(5);
+    const oc = expedienteBase({ etapaCRM: 5, cadena: { requiereSOW: false, pasos: { aElegido: false, hOC: true } } });
+    expect(etapaRecomendada(oc, CONFIG_DEFAULT)).toBe(5);
+    const crm4 = expedienteBase({ etapaCRM: 4, cadena: { pasos: { aElegido: false, hOC: true } } });
+    expect(etapaRecomendada(crm4, CONFIG_DEFAULT)).toBe(4);
+  });
+
   it('crm_5_sin_entregable_de_cierre_baja_a_4', () => {
     const sinEntregable = expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: true } } });
     expect(etapaRecomendada(sinEntregable, CONFIG_DEFAULT)).toBe(4);
     const firmado = expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: true, eFirmado: true } } });
     expect(etapaRecomendada(firmado, CONFIG_DEFAULT)).toBe(5);
+  });
+});
+
+describe('contradicciones de etapas anteriores', () => {
+  it('esContradiccion: solo ausente, y sin etapaRegistro o registrado con el CRM ya pasada la etapa', () => {
+    expect(esContradiccion({ clave: 'x', nivel: 'ausente' }, 1)).toBe(true);
+    expect(esContradiccion({ clave: 'x', nivel: 'ausente', etapaRegistro: 2 }, 1)).toBe(true);
+    expect(esContradiccion({ clave: 'x', nivel: 'ausente', etapaRegistro: 1 }, 1)).toBe(false);
+    expect(esContradiccion({ clave: 'x', nivel: 'supuesto' }, 1)).toBe(false);
+  });
+
+  it('contradiccionesPrevias lista solo las reales de etapas anteriores al CRM', () => {
+    const exp = expedienteBase({
+      etapaCRM: 4,
+      criteriosArgano: [
+        { clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 3 },       // "no sé" de su etapa: no
+        { clave: 'business_case_identificado', nivel: 'ausente', etapaRegistro: 3 }, // contradicción: sí
+        { clave: 'pr_aprobado', nivel: 'ausente' },                               // sin etapaRegistro: sí
+        { clave: 'acuerdo_cliente', nivel: 'ausente', etapaRegistro: 4 },         // etapa actual: no
+        { clave: 'propuesta_entregada', nivel: 'supuesto' },                      // supuesto: no
+      ],
+    });
+    expect(contradiccionesPrevias(exp, CONFIG_DEFAULT)).toEqual(['business_case_identificado', 'pr_aprobado']);
   });
 });
 

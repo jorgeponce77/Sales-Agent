@@ -195,7 +195,19 @@ describe('registrarCriterioArgano', () => {
     expect(registrarCriterioArgano(e, { clave, nivel: 'supuesto' }).ok).toBe(true);
     expect(registrarCriterioArgano(e, { clave, nivel: 'confirmado' }).ok).toBe(true);
     const lista = e.oportunidad.expediente.criteriosArgano.filter((c) => c.clave === clave);
-    expect(lista).toEqual([{ clave, nivel: 'confirmado' }]);
+    expect(lista).toEqual([{ clave, nivel: 'confirmado', etapaRegistro: 2 }]);
+  });
+
+  it('criterio_guarda_la_etapa_del_crm_al_registrarlo (revisión 1)', () => {
+    const e = estadoBase();
+    e.oportunidad.expediente.etapaCRM = 3;
+    // Un etapaRegistro que mande el modelo se ignora: lo pone la herramienta.
+    expect(registrarCriterioArgano(e, { clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 0 }).ok).toBe(true);
+    expect(registrarCriterioArgano(e, { criterios: [{ clave: 'pr_aprobado', nivel: 'ausente' }] }).ok).toBe(true);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([
+      { clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 3 },
+      { clave: 'pr_aprobado', nivel: 'ausente', etapaRegistro: 3 },
+    ]);
   });
 
   it('criterio_clave_inexistente', () => {
@@ -223,9 +235,9 @@ describe('registrarCriterioArgano', () => {
     });
     expect(r.ok).toBe(true);
     expect(e.oportunidad.expediente.criteriosArgano).toEqual([
-      { clave: 'cliente_confirma_real', nivel: 'confirmado', fuente: 'Laura (CFO)' },
-      { clave: 'entiende_cliente_dolores', nivel: 'supuesto' },
-      { clave: 'business_case_identificado', nivel: 'ausente' },
+      { clave: 'cliente_confirma_real', nivel: 'confirmado', fuente: 'Laura (CFO)', etapaRegistro: 2 },
+      { clave: 'entiende_cliente_dolores', nivel: 'supuesto', etapaRegistro: 2 },
+      { clave: 'business_case_identificado', nivel: 'ausente', etapaRegistro: 2 },
     ]);
     const ultimo = e.eventos[e.eventos.length - 1];
     expect(ultimo?.tipo).toBe('dato');
@@ -259,7 +271,7 @@ describe('registrarCriterioArgano', () => {
     expect(e.oportunidad.expediente.criteriosArgano).toEqual([]);
     const treinta = Array.from({ length: 30 }, () => ({ clave, nivel: 'supuesto' }));
     expect(registrarCriterioArgano(e, { criterios: treinta }).ok).toBe(true);
-    expect(e.oportunidad.expediente.criteriosArgano).toEqual([{ clave, nivel: 'supuesto' }]);
+    expect(e.oportunidad.expediente.criteriosArgano).toEqual([{ clave, nivel: 'supuesto', etapaRegistro: 2 }]);
   });
 
   it('criterio_forma_individual_y_lote_a_la_vez_se_rechaza (R6)', () => {
@@ -289,7 +301,7 @@ describe('registrarCriterioArgano', () => {
     expect(registrarCriterioArgano(e, { clave: interno, nivel: 'supuesto' }).ok).toBe(true);
     expect(registrarCriterioArgano(e, { clave: interno, nivel: 'confirmado', fuente: 'vendedor: PR-4411 aprobado' }).ok).toBe(true);
     expect(e.oportunidad.expediente.criteriosArgano).toEqual([
-      { clave: interno, nivel: 'confirmado', fuente: 'vendedor: PR-4411 aprobado' },
+      { clave: interno, nivel: 'confirmado', fuente: 'vendedor: PR-4411 aprobado', etapaRegistro: 2 },
     ]);
     expect(e.eventos[e.eventos.length - 1]?.descripcion).toContain('fuente: vendedor: PR-4411 aprobado');
   });
@@ -313,6 +325,16 @@ describe('registrarCriterioArgano', () => {
 });
 
 describe('registrarInfluencia', () => {
+  it('por cargo con nombre pendiente y después el nombre real con su personaId (revisión 3)', () => {
+    const e = estadoBase();
+    expect(registrarInfluencia(e, { nombre: 'Director de Compras (nombre pendiente)', roles: ['T'] }).ok).toBe(true);
+    const [inf] = e.oportunidad.expediente.influencias;
+    expect(inf?.nombre).toBe('Director de Compras (nombre pendiente)');
+    expect(registrarInfluencia(e, { personaId: inf?.personaId, nombre: 'Gustavo Leyva', grado: 'M' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.influencias).toHaveLength(1);
+    expect(e.oportunidad.expediente.influencias[0]).toMatchObject({ personaId: inf?.personaId, nombre: 'Gustavo Leyva', roles: ['T'], grado: 'M' });
+  });
+
   it('influencia_merge_por_nombre', () => {
     const e = estadoBase();
     expect(registrarInfluencia(e, { nombre: 'José Pérez', roles: ['E'], calificacion: 3 }).ok).toBe(true);

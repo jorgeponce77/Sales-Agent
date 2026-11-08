@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGO_REGLAS, CONFIG_DEFAULT, calcularDiagnostico } from 'motor-sales-agent';
 import { crearOportunidad } from '../src/ficha.js';
 import { DEFINICIONES_HERRAMIENTAS } from '../src/herramientas/definiciones.js';
-import { CRITERIOS_INTERNOS, VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
+import { CRITERIOS_INTERNOS, INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
 import { construirInstrucciones } from '../src/instrucciones/construir.js';
 import type { ModoSesion, Oportunidad } from '../src/tipos.js';
 import { fichaBase } from './fabrica.js';
@@ -145,14 +145,14 @@ describe('construirInstrucciones', () => {
     const op = opAlfa();
     const diag = calcularDiagnostico(op.expediente, HOY);
     const manana = construirInstrucciones(op, 'calificar', HOY, diag, 9).variable;
-    expect(manana).toContain('Hora local del vendedor: 09 h → saludo: buenos días');
-    expect(construirInstrucciones(op, 'calificar', HOY, diag, 15).variable).toContain('Hora local del vendedor: 15 h → saludo: buenas tardes');
-    expect(construirInstrucciones(op, 'calificar', HOY, diag, 22).variable).toContain('Hora local del vendedor: 22 h → saludo: buenas noches');
-    expect(construirInstrucciones(op, 'calificar', HOY, diag, 0).variable).toContain('Hora local del vendedor: 00 h → saludo: buenas noches');
+    expect(manana).toContain('Hora local del vendedor: 09 h → saludo: buenos días (en inglés: Good morning)');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 15).variable).toContain('Hora local del vendedor: 15 h → saludo: buenas tardes (en inglés: Good afternoon)');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 22).variable).toContain('Hora local del vendedor: 22 h → saludo: buenas noches (en inglés: Good evening)');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 0).variable).toContain('Hora local del vendedor: 00 h → saludo: buenas noches (en inglés: Good evening)');
     // Sin hora (o con una hora inválida), saludo neutro.
     for (const hora of [undefined, 24, -1, 9.5, Number.NaN]) {
       const v = construirInstrucciones(op, 'calificar', HOY, diag, hora).variable;
-      expect(v).toContain('Hora local del vendedor: desconocida → saludo neutro ("Hola, …")');
+      expect(v).toContain('Hora local del vendedor: desconocida → saludo neutro ("Hola, …"; en inglés, "Hi, …")');
     }
     // La hora no entra a la parte fija (cacheable).
     expect(construirInstrucciones(op, 'calificar', HOY, diag, 9).fijo).toBe(construir(op).fijo);
@@ -175,6 +175,10 @@ describe('construirInstrucciones', () => {
       expect(f).not.toMatch(/Eres el coach comercial/);
       const rol = seccion('## 1. Rol', '**Qué recibes.**');
       expect(rol).toContain('Eres el asesor comercial');
+      // Ninguna oración junta "asesor comercial" (o "sales advisor") con Netlogistik (revisión 9).
+      const oraciones = INSTRUCCIONES_BASE.split(/(?<=[.!?])\s+|\n/);
+      const juntas = oraciones.filter((o) => /asesor comercial|sales advisor/i.test(o) && /Netlogistik/i.test(o));
+      expect(juntas).toEqual([]);
     });
 
     it('apertura cordial con la hora local y aviso de visibilidad amable', () => {
@@ -183,6 +187,7 @@ describe('construirInstrucciones', () => {
         expect(apertura).toContain(t);
       }
       expect(apertura).toMatch(/nunca[^.]*"de Netlogistik"/i);
+      expect(apertura).toMatch(/Good morning\/Good afternoon\/Good evening/);
       // Retorno: saludo cordial de una línea antes del resumen.
       expect(apertura.slice(apertura.indexOf('**Retorno**'))).toMatch(/saludo cordial/i);
     });
@@ -226,12 +231,53 @@ describe('construirInstrucciones', () => {
         previo = i;
       }
       expect(checklist).toMatch(/primer "no"/);
-      expect(checklist).toContain('ya hiciste el checklist de cierre para validar la fecha que comprometes');
+      // Encuadre como afirmación y luego la pregunta 1 (revisión 5).
+      expect(checklist).toContain('"Si tu cierre es el <fecha del CRM>, validemos tu checklist de cierre. ¿Ya te dijeron que eres el elegido?"');
+      expect(checklist).not.toContain('¿ya hiciste el checklist');
     });
 
     it('4.11: con duda, pregunta solo en la etapa actual y el checklist', () => {
       const cadena = seccion('### 4.11 Cadena de cierre', 'Checklist de cierre');
       expect(cadena).not.toContain('con duda, pregunta.');
+      expect(cadena).toContain('Si tienes duda sobre un paso, pregunta solo cuando sea de la etapa actual o del checklist de cierre de Finalizing');
+      expect(cadena).toContain('no repreguntes un paso que el vendedor ya contestó');
+      expect(cadena).toContain('se preguntan una vez, cuando toque (en Finalizing, en el punto 4 del checklist de cierre)');
+    });
+
+    it('etapa 3: Assessment presumido y propuesta entregada como momento, no como prueba (revisión 2)', () => {
+      const etapas = seccion('### 4.12 Etapas', '### 4.13');
+      const e3 = etapas.slice(etapas.indexOf('- **3 Negotiating'), etapas.indexOf('- **4 Finalizing'));
+      expect(e3).toContain('Assessment presentado al Económico');
+      expect(e3).not.toMatch(/propuesta desarrollada y presentada al Económico/);
+      expect(e3).toContain('`propuesta_entregada`');
+      expect(e3).toContain('"¿Cómo te fue al presentarle la propuesta al Económico?"');
+      expect(e3).toMatch(/nunca[^.]*"¿Ya entregaste la propuesta\?"/i);
+      const e4 = etapas.slice(etapas.indexOf('- **4 Finalizing'), etapas.indexOf('- **5 Won'));
+      expect(e4).toMatch(/Se da por hecho:[^.]*propuesta entregada/);
+    });
+
+    it('nombres: una vez y, si no lo sabe, por cargo con "(nombre pendiente)"; Técnico solo ante contradicción (revisión 3)', () => {
+      const reglas = seccion('## 2. Reglas de conversación', '### Límites duros');
+      const r5 = reglas.slice(reglas.indexOf('5. **Nunca inventes datos.**'), reglas.indexOf('6. **'));
+      expect(r5).toContain('una sola vez');
+      expect(r5).toContain('"<cargo> (nombre pendiente)"');
+      const e = seccion('### 4.2', '### 4.3');
+      expect(e).not.toContain('¿Tú recomiendas o das el visto bueno final? ¿Alguien más puede vetarlo?');
+      expect(e).toContain('Solo si algo concreto contradice al vendedor');
+    });
+
+    it('ningún ejemplo entre comillas tiene más de una pregunta (revisión 4)', () => {
+      const ejemplos = [...INSTRUCCIONES_BASE.matchAll(/"([^"\n]*)"/g)].map((m) => m[1] ?? '');
+      expect(ejemplos.length).toBeGreaterThan(20);
+      const dobles = ejemplos.filter((t) => (t.match(/\?/g) ?? []).length > 1);
+      expect(dobles).toEqual([]);
+      // Tampoco listas de preguntas sueltas en una misma línea fuera de comillas (Budget, compelling event, higiene…).
+      const lineas = INSTRUCCIONES_BASE.split('\n').filter((l) => !/^\d+\. /.test(l.trim()));
+      const conVarias = lineas.filter((l) => (l.replace(/"[^"\n]*"/g, '').match(/\?/g) ?? []).length > 1);
+      expect(conVarias).toEqual([]);
+      const alt = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'registrar_alternativa')?.description ?? '';
+      expect(alt).toContain('una sola pregunta');
+      expect(alt).not.toContain('pregunta si hay una solución interna, si el presupuesto se podría ir a otra cosa y si el cliente podría no hacer nada');
     });
   });
 
@@ -247,12 +293,21 @@ describe('construirInstrucciones', () => {
     expect(variable).toMatch(/propuesta_entregada confirmado/);
     expect(variable).toMatch(/pr_aprobado pendiente/);
     expect(variable).toContain('Etapas 0 a 2: se dan por hechas (no se preguntan) · contradicciones registradas: business_case_identificado');
+    // Un "no sé" registrado mientras el CRM estaba en esa etapa no es contradicción (revisión 1).
+    const subio = opBeta();
+    subio.expediente.etapaCRM = 4;
+    subio.expediente.cadena.pasos.aElegido = true;
+    subio.expediente.criteriosArgano.push(
+      { clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 3 },
+      { clave: 'entiende_cliente_dolores', nivel: 'ausente', etapaRegistro: 3 },
+    );
+    expect(construir(subio).variable).toContain('Etapas 0 a 3: se dan por hechas (no se preguntan) · contradicciones registradas: entiende_cliente_dolores\n');
     const sinNada = construir(opAlfa()).variable; // etapa 2
     expect(sinNada).toContain('Etapas 0 a 1: se dan por hechas (no se preguntan) · contradicciones registradas: ninguna');
   });
 
   it('version', () => {
-    expect(VERSION_INSTRUCCIONES).toBe('2026-11-08.1');
+    expect(VERSION_INSTRUCCIONES).toBe('2026-11-08.2');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
   });
 });

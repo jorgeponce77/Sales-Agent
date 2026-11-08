@@ -7,5 +7,6 @@ export { validarAcciones } from './acciones.js';
 export { huecosPriorizados } from './huecos.js';
 export { motivosAnalisisCompleto } from './analisisCompleto.js';
 export { construirContexto } from './contexto.js';
+export { contradiccionesPrevias, esContradiccion } from './etapa.js';
 export type { Contexto } from './contexto.js';
 export { evaluarBanderas, evaluarFortalezas, CATALOGO_REGLAS, CATALOGO_FORTALEZAS_IDS } from './reglas/index.js';

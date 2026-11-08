@@ -30,8 +30,8 @@ function criterios(claves: string[]): CriterioCumplido[] {
   return claves.map((clave) => ({ clave, nivel: 'confirmado', fuente: 'vendedor: referencia del escenario' }));
 }
 
-/** Contradicciones dichas por el vendedor: criterios en `ausente`. */
-function contradicciones(claves: string[]): CriterioCumplido[] {
+/** Criterios en `ausente`: "no sé" o "no" de la etapa actual, o contradicciones de etapas anteriores. */
+function ausentes(claves: string[]): CriterioCumplido[] {
   return claves.map((clave) => ({ clave, nivel: 'ausente' }));
 }
 
@@ -70,7 +70,7 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         pasos: { aElegido: false, bContratoEnviado: false, cComentariosRecibidos: false, dEnFirma: false, eFirmado: false, fAltaProveedor: false, hOC: false },
       };
       // Etapa actual (4): nada cumplido. Las etapas 0 a 3 se presumen; la etapa la baja el paso a (no elegidos).
-      exp.criteriosArgano = contradicciones(['acuerdo_cliente', 'fecha_inicio_confirmada', 'demand_signal_confirmado', 'sow_enviado_firma']);
+      exp.criteriosArgano = ausentes(['acuerdo_cliente', 'fecha_inicio_confirmada', 'demand_signal_confirmado', 'sow_enviado_firma']);
       exp.higieneCRM = { valores: false, actividades: false, etapas: false };
       break;
     }
@@ -90,7 +90,10 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
         need: ev('Fletes caros, rutas en Excel, sin trazabilidad', 'confirmado', hace(21)),
         time: ev('Cierre según el ciclo', 'supuesto', hace(1)),
       };
-      // Etapa actual (2): solo la propuesta desarrollada. Las etapas 0 y 1 se presumen.
+      // Etapa actual (2): solo la propuesta desarrollada. Las etapas 0 y 1 se presumen. No se registra la falta de
+      // presupuesto de la etapa 1: el vendedor es vago ("creo que hay presupuesto", "no sé"), y una duda sobre una
+      // etapa anterior no es contradicción (no se registra); su admisión de higiene ("subí la etapa sin confirmar")
+      // no señala un criterio concreto. Las banderas esperadas (sin Económico, banco de una pata) no dependen de ello.
       exp.criteriosArgano = criterios(['propuesta_desarrollada']);
       exp.higieneCRM = { valores: true, actividades: null, etapas: false };
       break;
@@ -116,7 +119,7 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
       // Etapa actual (1). La etapa 0 se presume.
       exp.criteriosArgano = [
         ...criterios(['volumen_presupuesto_aprox', 'aprobacion_calificacion_presupuesto_cliente', 'rfp_analizado', 'confirma_recibir_propuesta']),
-        ...contradicciones(['entiende_cliente_dolores', 'business_case_identificado']),
+        ...ausentes(['entiende_cliente_dolores', 'business_case_identificado']),
       ];
       exp.cadena = { ...exp.cadena, ruta: 'contrato', requiereSOW: true };
       exp.higieneCRM = { valores: true, actividades: true, etapas: true };
@@ -152,7 +155,7 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
       // el cliente no ha aprobado presupuesto para esta propuesta (la partida es del piloto de TI).
       exp.criteriosArgano = [
         ...criterios(['propuesta_desarrollada']),
-        ...contradicciones(['aprobacion_calificacion_presupuesto_cliente', 'requerimientos_refinados']),
+        ...ausentes(['aprobacion_calificacion_presupuesto_cliente', 'requerimientos_refinados']),
       ];
       exp.higieneCRM = { valores: true, actividades: false, etapas: true };
       break;
@@ -196,11 +199,13 @@ export function expedienteDeVerdad(id: Id, ficha: Ficha, hoy: string): Expedient
       // Etapa actual (3): los cumplidos con su referencia y los dos pendientes. Las etapas 0 a 2 se presumen.
       exp.criteriosArgano = [
         ...criterios(['aprobacion_interna_recursos_margen', 'pr_aprobado', 'propuesta_entregada', 'forecast_actualizado']),
-        ...contradicciones(['sow_precios_finalizados', 'staffing_request']),
+        ...ausentes(['sow_precios_finalizados', 'staffing_request']),
       ];
       exp.higieneCRM = { valores: true, actividades: true, etapas: true };
       break;
     }
   }
+  // Como `registrar_criterio_argano`: cada criterio guarda la etapa del CRM al registrarse.
+  exp.criteriosArgano = exp.criteriosArgano.map((c) => ({ ...c, etapaRegistro: exp.etapaCRM }));
   return exp;
 }
