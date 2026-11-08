@@ -71,10 +71,11 @@ describe('calcularDiagnostico', () => {
     expect(d.probabilidadDeclarada).toBe(65);
     expect(d.lente).toBe('director');
     expect(d.fecha?.diasPendientes).toBe(15);
-    // Sin criterios de Argano confirmados la etapa recomendada es 0: ENxT[0] = 0 y el CRM está inflado.
-    expect(d.etapaRecomendada).toBe(0);
-    expect(d.probabilidadAjustada).toBe(0);
-    expect(d.comparacionEtapa).toBe('inflada');
+    // Presunción por etapa: sin contradicciones registradas, las etapas 0–2 se dan por cumplidas
+    // y hay proveedor elegido, así que la recomendada es la del CRM: ENxT[3] = 65, al día.
+    expect(d.etapaRecomendada).toBe(3);
+    expect(d.probabilidadAjustada).toBe(65);
+    expect(d.comparacionEtapa).toBe('al_dia');
   });
 
   it('con lente gerente fecha es null y fechaOptimista viene del contexto', () => {

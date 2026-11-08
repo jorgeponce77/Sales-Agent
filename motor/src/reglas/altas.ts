@@ -1,6 +1,6 @@
 import type { Contexto } from '../contexto.js';
 import type { Evidencia } from '../tipos.js';
-import { esCoachValido } from './helpers.js';
+import { causaEtapaInflada, esCoachValido } from './helpers.js';
 import type { Regla } from './tipos.js';
 
 type ElementoBant = 'budget' | 'authority' | 'need' | 'time';
@@ -69,7 +69,7 @@ export const REGLAS_ALTAS: Regla[] = [
     lente: 'ambas',
     evaluar: (ctx) =>
       ctx.comparacion.diferencia === 1
-        ? `La etapa del CRM está una etapa por encima de lo que sostienen los criterios (etapa ${ctx.etapaRec}).`
+        ? `La etapa del CRM está una etapa por encima ${causaEtapaInflada(ctx)}.`
         : null,
   },
   {

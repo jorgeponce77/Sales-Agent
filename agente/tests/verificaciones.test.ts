@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { ESCENARIOS } from '../src/index.js';
 import type { Escenario, Mensaje, Oportunidad } from '../src/index.js';
 import { crearOportunidad } from '../src/ficha.js';
-import { verificar } from '../evals/verificaciones.js';
+import { mensajesHastaDiagnostico, verificar } from '../evals/verificaciones.js';
 import { interpretarRespuestaVendedor, responderComoVendedor } from '../evals/vendedorSimulado.js';
 import { crearClienteFalso, texto } from './clienteFalso.js';
 import { fichaBase } from './fabrica.js';
@@ -41,12 +41,13 @@ describe('verificar: una_pregunta', () => {
     expect(por(E1, op, 'una_pregunta').ok).toBe(false);
   });
 
-  it('dos signos de interrogación o menos pasan, también en la sesión en curso', () => {
-    const op = opCon([msg('agente', `${ES} ¿Quién decide? ¿Cuándo?`)]);
+  it('una sola pregunta por mensaje (2026-11-08): un "?" pasa y dos fallan, también en la sesión en curso', () => {
+    const op = opCon([msg('agente', `${ES} ¿Quién decide?`)]);
     expect(por(E1, op, 'una_pregunta').ok).toBe(true);
+    expect(por(E1, opCon([msg('agente', `${ES} ¿Quién decide? ¿Cuándo?`)]), 'una_pregunta').ok).toBe(false);
     op.sesionActual = {
       modo: 'calificar', inicio: HOY, turnosVendedor: 1, versionInstrucciones: 'v', historial: [],
-      transcripcion: [msg('agente', '¿A? ¿B? ¿C?')],
+      transcripcion: [msg('agente', '¿A? ¿B?')],
     };
     expect(por(E1, op, 'una_pregunta').ok).toBe(false);
   });
@@ -95,6 +96,20 @@ describe('verificar: sin_personas_inventadas', () => {
   it('un nombre completo o parcial de los hechos pasa, sin importar acentos ni mayúsculas', () => {
     expect(por(E1, conInfluencia('Héctor Salgado'), 'sin_personas_inventadas').ok).toBe(true);
     expect(por(E1, conInfluencia('hector salgado villanueva'), 'sin_personas_inventadas').ok).toBe(true);
+  });
+
+  it('una persona registrada por cargo "(nombre pendiente)" pasa si el cargo está en los hechos (revisión 3)', () => {
+    expect(por(E1, conInfluencia('Director de Compras (nombre pendiente)'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(E1, conInfluencia('director de compras (Nombre Pendiente)'), 'sin_personas_inventadas').ok).toBe(true);
+    const v = por(E1, conInfluencia('Director de Marketing (nombre pendiente)'), 'sin_personas_inventadas');
+    expect(v.ok).toBe(false);
+    expect(v.detalle).toContain('Director de Marketing (nombre pendiente)');
+  });
+
+  it('quita cualquier paréntesis del nombre antes de comparar (revisión 2.5)', () => {
+    expect(por(E1, conInfluencia('Héctor Salgado (Operaciones)'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(E1, conInfluencia('Raúl Ibarra (Director de TI)'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(E1, conInfluencia('Laura Méndez (CFO)'), 'sin_personas_inventadas').ok).toBe(false);
   });
 
   it('sin influencias pasa', () => {
@@ -146,6 +161,47 @@ describe('verificar: banderas_esperadas', () => {
     expect(verificar(E1, opCon([msg('agente', ES)])).map((v) => v.nombre)).toEqual([
       'una_pregunta', 'idioma', 'sin_personas_inventadas', 'cierre_con_diagnostico', 'banderas_esperadas',
     ]);
+  });
+});
+
+describe('informativo: mensajes_hasta_diagnostico', () => {
+  it('cuenta los mensajes del agente hasta el primero que da el diagnóstico (incluido), entre sesiones', () => {
+    const op = opCon([
+      msg('agente', '¡Buenos días! ¿Cuál es el estatus del negocio?'),
+      msg('vendedor', 'Vamos bien.'),
+      msg('agente', '¿Quién firma?'),
+      msg('vendedor', 'La CFO.'),
+      msg('agente', 'Semáforo ámbar, índice 58/100: la etapa está al día.'),
+      msg('agente', 'Otro mensaje con semáforo e índice.'),
+    ]);
+    const v = mensajesHastaDiagnostico(op);
+    expect(v).toMatchObject({ nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: 3 });
+    expect(v.detalle).toContain('3');
+  });
+
+  it('reconoce el diagnóstico en inglés', () => {
+    const op = opCon([msg('agente', 'Good morning!'), msg('agente', 'Traffic light: green, index 82/100.')]);
+    expect(mensajesHastaDiagnostico(op).mensajes).toBe(2);
+  });
+
+  it('exige semáforo e índice en el mismo mensaje: mencionar solo el semáforo no cuenta (revisión 9)', () => {
+    const op = opCon([
+      msg('agente', 'Hoy el semáforo está en rojo por el presupuesto; ¿quién lo libera?'),
+      msg('agente', 'El índice de madurez quedó en 35.'),
+      msg('agente', 'Diagnóstico: semáforo rojo, índice 35/100.'),
+    ]);
+    expect(mensajesHastaDiagnostico(op).mensajes).toBe(3);
+  });
+
+  it('sin diagnóstico en la conversación no falla: lo informa', () => {
+    const v = mensajesHastaDiagnostico(opCon([msg('agente', ES)]));
+    expect(v.ok).toBe(true);
+    expect(v.mensajes).toBeNull();
+    expect(v.detalle).toMatch(/no se encontró/i);
+  });
+
+  it('no forma parte de verificar (no puede fallar un escenario)', () => {
+    expect(verificar(E1, opCon([msg('agente', ES)])).map((v) => v.nombre)).not.toContain('mensajes_hasta_diagnostico');
   });
 });
 

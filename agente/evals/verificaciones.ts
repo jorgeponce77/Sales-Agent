@@ -21,11 +21,12 @@ function normalizar(t: string): string {
     .trim();
 }
 
+/** Una sola pregunta por mensaje (instrucciones 2026-11-08.1): más de un "?" en un mensaje del agente falla. */
 function unaPregunta(op: Oportunidad): Verificacion {
-  const malos = mensajesDelAgente(op).filter((m) => (m.texto.match(/\?/g) ?? []).length > 2);
+  const malos = mensajesDelAgente(op).filter((m) => (m.texto.match(/\?/g) ?? []).length > 1);
   return malos.length === 0
-    ? { nombre: 'una_pregunta', ok: true, detalle: 'Ningún mensaje del agente tiene más de 2 "?".' }
-    : { nombre: 'una_pregunta', ok: false, detalle: `${malos.length} mensaje(s) con más de 2 "?"; el primero: "${recorte(malos[0]?.texto ?? '')}"` };
+    ? { nombre: 'una_pregunta', ok: true, detalle: 'Ningún mensaje del agente tiene más de un "?".' }
+    : { nombre: 'una_pregunta', ok: false, detalle: `${malos.length} mensaje(s) con más de un "?"; el primero: "${recorte(malos[0]?.texto ?? '')}"` };
 }
 
 function idioma(esc: Escenario, op: Oportunidad): Verificacion {
@@ -47,7 +48,12 @@ function idioma(esc: Escenario, op: Oportunidad): Verificacion {
 function sinPersonasInventadas(esc: Escenario, op: Oportunidad): Verificacion {
   // Con espacios alrededor, la comparación es por palabras completas: "Ana" no coincide con "semana".
   const hechos = ` ${normalizar(esc.hechosOcultos)} `;
-  const inventadas = op.expediente.influencias.map((i) => i.nombre).filter((n) => !hechos.includes(` ${normalizar(n)} `));
+  // Se quita cualquier paréntesis antes de comparar: "<cargo> (nombre pendiente)" (regla 5) pasa si el cargo está
+  // en los hechos, y "Karina (Planificación)" se compara como "Karina".
+  const comparable = (n: string): string => n.replace(/\([^)]*\)/g, ' ');
+  const inventadas = op.expediente.influencias
+    .map((i) => i.nombre)
+    .filter((n) => !hechos.includes(` ${normalizar(comparable(n))} `));
   return inventadas.length === 0
     ? { nombre: 'sin_personas_inventadas', ok: true, detalle: 'Todas las personas registradas aparecen en los hechos.' }
     : { nombre: 'sin_personas_inventadas', ok: false, detalle: `Personas que no están en los hechos: ${inventadas.join(', ')}.` };
@@ -75,4 +81,23 @@ function banderasEsperadas(esc: Escenario, op: Oportunidad): Verificacion {
 /** Comprobaciones automáticas sobre la oportunidad resultante de una conversación simulada. */
 export function verificar(esc: Escenario, op: Oportunidad): Verificacion[] {
   return [unaPregunta(op), idioma(esc, op), sinPersonasInventadas(esc, op), cierreConDiagnostico(op), banderasEsperadas(esc, op)];
+}
+
+/** Señales del diagnóstico del motor en un mensaje del agente: el semáforo y el índice, en español o inglés. */
+const SEMAFORO = /sem[aá]foro|traffic light/i;
+const INDICE = /[ií]ndice|\bindex\b|\b\d{1,3}\s*\/\s*100\b/i;
+
+/**
+ * Informativo, nunca falla: cuántos mensajes del agente hubo hasta el primero que da el diagnóstico (incluido),
+ * contando las sesiones en orden. Sirve para ver si la conversación se alarga por preguntas redundantes.
+ * Criterio: el primer mensaje del agente que nombra el semáforo y el índice a la vez (el diagnóstico de §3.5 da
+ * los dos). No se usa la llamada a `calcular_diagnostico` porque las sesiones archivadas solo guardan la
+ * transcripción, sin las herramientas.
+ */
+export function mensajesHastaDiagnostico(op: Oportunidad): Verificacion & { mensajes: number | null } {
+  const mensajes = mensajesDelAgente(op);
+  const i = mensajes.findIndex((m) => SEMAFORO.test(m.texto) && INDICE.test(m.texto));
+  return i < 0
+    ? { nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: null, detalle: `No se encontró el diagnóstico en los ${mensajes.length} mensajes del agente.` }
+    : { nombre: 'mensajes_hasta_diagnostico', ok: true, mensajes: i + 1, detalle: `${i + 1} mensaje(s) del agente hasta el diagnóstico (de ${mensajes.length}).` };
 }

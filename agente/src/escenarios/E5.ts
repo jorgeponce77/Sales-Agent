@@ -42,10 +42,8 @@ CADENA DE CIERRE:
 - Si el agente pregunta cómo van los pasos del contrato: el SOW todavía no sale y esperas enviarlo esta semana; después vendrán los comentarios de Tlalli, la negociación y las firmas. Ya pediste a Legal de Tlalli una revisión en paralelo para no perder tiempo. Es ajustado, pero crees que llegan a la fecha de cierre del CRM.
 
 CRITERIOS DE ARGANO (con referencias; son hechos internos):
-- Etapa 0: fuente creíble (cliente existente que pidió la ampliación); el cliente confirmó que es real (correo de Quiroz); alineada con la estrategia (aprobada por tu gerente, Paola Cervantes, hace unos 2 meses).
-- Etapa 1: dolores entendidos (documento de la autoridad y reunión con Cano); volumen y presupuesto aproximados conocidos; revisión de calificación y aprobación de presupuesto del cliente: comité de inversiones de Tlalli, hace 3 semanas; business case identificado (evitar multa y suspensión); el cliente confirmó que quiere la propuesta (correo de Quiroz).
-- Etapa 2: propuesta desarrollada (versión 2); requerimientos refinados con Beltrán; recursos y presupuesto evaluados; estrategia de delivery refinada con los SMEs (Gilberto Marín, líder de delivery de Voice, hace 4 semanas); revenue, equipo y calendario definidos antes de Deal Approval.
-- Etapa 3: aprobación interna de recursos, tiempos y margen: sí, Deal Approval de Rodrigo Valdés (Finanzas Netlogistik) hace 12 días. Proceso PR aprobado: PR-2026-0433, aprobador Rodrigo Valdés, hace 12 días. Propuesta entregada: sí (versión 2, hace 5 semanas). Forecast actualizado: sí, hace 7 días. SOW y lista de precios finalizados con el cliente: NO (faltan dos puntos de precio). Staffing request: NO, se levanta al cerrar el SOW.
+- Etapas 0 a 2: todo cumplido y documentado, como lo implica la etapa 3 del CRM; el agente no debería preguntártelo. Si aun así te lo pregunta, lo confirmas en una línea ("yes, all of that is done and documented") sin repetir el detalle.
+- Etapa 3 (la actual): aprobación interna de recursos, tiempos y margen: sí, Deal Approval de Rodrigo Valdés (Finanzas Netlogistik) hace 12 días. Proceso PR aprobado: PR-2026-0433, aprobador Rodrigo Valdés, hace 12 días. Propuesta entregada: sí (versión 2, hace 5 semanas). Forecast actualizado: sí, hace 7 días. SOW y lista de precios finalizados con el cliente: NO (faltan dos puntos de precio). Staffing request: NO, se levanta al cerrar el SOW.
 - Etapa 4: nada cumplido todavía, y lo reconoces.
 
 HIGIENE DEL CRM: al día: valores sí, actividades sí, etapas sí (actualizado hace 7 días).

@@ -58,7 +58,8 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     name: 'registrar_criterio_argano',
     description:
       'Registra el nivel de cumplimiento de criterios de Argano; cada clave reemplaza su nivel anterior, no acumula. ' +
-      'Úsala cuando el vendedor confirme, suponga o desconozca si un criterio se cumple. Dos formas: un criterio {clave, nivel, fuente?} ' +
+      'Úsala con los criterios de la etapa actual del CRM cuando el vendedor confirme, suponga o desconozca si se cumplen. ' +
+      'Los de etapas anteriores se dan por cumplidos: no los preguntes y regístralos (en "ausente") solo si el vendedor los contradice. Dos formas: un criterio {clave, nivel, fuente?} ' +
       'o un lote {criterios: [{clave, nivel, fuente?}, ...]} de 1 a 30 (registra los criterios de una etapa en una sola llamada). ' +
       'El lote es atómico: si un elemento es inválido no se registra ninguno y vuelven todos los errores. ' +
       'Los criterios internos de Argano/Netlogistik con nivel "confirmado" exigen fuente con la referencia verificable del vendedor ' +
@@ -91,14 +92,18 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     name: 'registrar_influencia',
     description:
       'Crea o actualiza una Influencia (persona del cliente) con su rol, grado, modo, calificación, contacto y Triunfo-Resultado. ' +
-      'Úsala cuando el vendedor mencione a una persona de la cuenta o cambie algo de ella. Si ya existe (mismo personaId o nombre), solo se actualizan los campos que envíes. ' +
+      'Úsala cuando el vendedor mencione a una persona de la cuenta o cambie algo de ella. Si ya existe (mismo personaId o nombre), solo se actualizan los campos que envíes; con personaId, un nombre nuevo reemplaza al anterior. ' +
+      '"nombre" lleva solo el nombre, tal como lo dijo el vendedor (sin cargo ni paréntesis); el cargo va en "cargo". ' +
+      'Si el vendedor no sabe el nombre, regístrala por cargo: "<cargo> (nombre pendiente)". ' +
+      'Regístrala solo si el vendedor dice que esa persona existe y cumple ese rol; si solo lo supone ("creo que es el gerente general"), no la registres. ' +
       'Roles: E Económico, U Usuario, T Técnico, C Coach. Grado: A alto, M medio, B bajo. Modo: C Crecimiento, P Problema, E Equilibrio, EC Exceso de confianza. ' +
       'La calificación es un entero de -5 a -1 o de 1 a 5 (el 0 no existe).',
     input_schema: {
       type: 'object',
       properties: {
         personaId: { type: 'string', description: 'Identificador de una influencia ya registrada (opcional).' },
-        nombre: { type: 'string', maxLength: 120, description: 'Nombre de la persona (máximo 120 caracteres).' },
+        nombre: { type: 'string', maxLength: 120, description: 'Solo el nombre de la persona, como lo dijo el vendedor (máximo 120 caracteres).' },
+        cargo: { type: 'string', maxLength: 120, description: 'Cargo o área de la persona, como lo dijo el vendedor (opcional).' },
         roles: { type: 'array', items: { type: 'string', enum: ROLES }, description: 'Roles que cumple en la compra.' },
         grado: { type: ['string', 'null'], enum: [...GRADO, null], description: 'Grado de influencia.' },
         modo: { type: ['string', 'null'], enum: [...MODO, null], description: 'Modo de la persona.' },
@@ -117,7 +122,8 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     description:
       'Registra una alternativa a la compra (otro proveedor, solución interna, presupuesto en otra cosa o no hacer nada) y su posición; ' +
       'también marca que la pregunta de competencia ya se hizo. Úsala cuando el vendedor diga contra qué o quién compite la oportunidad. ' +
-      'Si dice que no hay competencia, antes de registrar pregunta si hay una solución interna, si el presupuesto se podría ir a otra cosa y si el cliente podría no hacer nada; ' +
+      'Si dice que no hay competencia, antes de registrar haz una sola pregunta por las demás alternativas (solución interna, presupuesto en otra cosa, no hacer nada): ' +
+      '"¿El cliente podría resolverlo en casa, usar ese dinero en otro proyecto o no hacer nada?"; ' +
       'registra la que exista con su tipo y posición. Registra "no_hacer_nada" con posición "nula" solo si de verdad no hay alternativa de ningún tipo. ' +
       'Para el motor la posición general es la peor de las alternativas registradas, y es Nula si no hay ninguna (con la pregunta hecha) o si todas están en nula. ' +
       'Si ya existe (mismo tipo y nombre), actualiza su posición.',

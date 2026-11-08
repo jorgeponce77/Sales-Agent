@@ -33,6 +33,11 @@ export interface OpcionesTurno {
   limiteMs?: number;
   /** Reloj en ms (por defecto Date.now); se inyecta en las pruebas. */
   ahora?: () => number;
+  /**
+   * Hora local del vendedor (entero 0–23), para el saludo de la apertura. La calcula quien llama
+   * (p. ej. con `horaLocalPorPais`); si falta o no es válida, el agente usa un saludo neutro.
+   */
+  horaLocal?: number;
 }
 
 // El spec fijaba 1024, pero claude-sonnet-5-5 piensa por defecto (thinking adaptativo) y el thinking cuenta
@@ -174,7 +179,7 @@ async function conversar(
 ): Promise<Conversacion> {
   // R1: diagnóstico vigente al inicio del turno; las instrucciones se construyen una vez.
   const diag = calcularDiagnostico(trabajo.expediente, o.hoy);
-  const { fijo, variable } = construirInstrucciones(trabajo, sesion.modo, o.hoy, diag);
+  const { fijo, variable } = construirInstrucciones(trabajo, sesion.modo, o.hoy, diag, o.horaLocal);
   // El system es solo la parte fija (cacheable entre turnos). El contexto variable va como bloque interno al
   // inicio del mensaje de este turno, solo en la copia que se envía: nunca se guarda en el historial.
   const system: Anthropic.Messages.TextBlockParam[] = [{ type: 'text', text: fijo, cache_control: { type: 'ephemeral' } }];

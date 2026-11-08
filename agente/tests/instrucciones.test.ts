@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGO_REGLAS, CONFIG_DEFAULT, calcularDiagnostico } from 'motor-sales-agent';
 import { crearOportunidad } from '../src/ficha.js';
 import { DEFINICIONES_HERRAMIENTAS } from '../src/herramientas/definiciones.js';
-import { CRITERIOS_INTERNOS, VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
+import { CRITERIOS_INTERNOS, INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from '../src/instrucciones/base.js';
 import { construirInstrucciones } from '../src/instrucciones/construir.js';
 import type { ModoSesion, Oportunidad } from '../src/tipos.js';
 import { fichaBase } from './fabrica.js';
@@ -141,8 +141,245 @@ describe('construirInstrucciones', () => {
     expect((inf?.input_schema.properties['nombre'] as { maxLength?: number }).maxLength).toBe(120);
   });
 
+  it('hora_local_y_saludo_en_el_contexto', () => {
+    const op = opAlfa();
+    const diag = calcularDiagnostico(op.expediente, HOY);
+    const manana = construirInstrucciones(op, 'calificar', HOY, diag, 9).variable;
+    expect(manana).toContain('Hora local del vendedor: 09 h → saludo: buenos días (en inglés: Good morning)');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 15).variable).toContain('Hora local del vendedor: 15 h → saludo: buenas tardes (en inglés: Good afternoon)');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 22).variable).toContain('Hora local del vendedor: 22 h → saludo: buenas noches (en inglés: Good evening)');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 0).variable).toContain('Hora local del vendedor: 00 h → saludo: buenas noches (en inglés: Good evening)');
+    // Sin hora (o con una hora inválida), saludo neutro.
+    for (const hora of [undefined, 24, -1, 9.5, Number.NaN]) {
+      const v = construirInstrucciones(op, 'calificar', HOY, diag, hora).variable;
+      expect(v).toContain('Hora local del vendedor: desconocida → saludo neutro ("Hola, …"; en inglés, "Hi, …")');
+    }
+    // La hora no entra a la parte fija (cacheable).
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 9).fijo).toBe(construir(op).fijo);
+  });
+
+  describe('calibración por etapa (2026-11-08)', () => {
+    const fijo = (): string => construir(opAlfa()).fijo;
+    const seccion = (desde: string, hasta: string): string => {
+      const f = fijo();
+      const i = f.indexOf(desde);
+      expect(i).toBeGreaterThanOrEqual(0);
+      const j = f.indexOf(hasta, i + desde.length);
+      return f.slice(i, j < 0 ? undefined : j);
+    };
+
+    it('se presenta como asesor comercial, nunca de Netlogistik', () => {
+      const f = fijo();
+      expect(f).toContain('asesor comercial');
+      expect(f).toContain('your sales advisor');
+      expect(f).not.toMatch(/Eres el coach comercial/);
+      const rol = seccion('## 1. Rol', '**Qué recibes.**');
+      expect(rol).toContain('Eres el asesor comercial');
+      // Ninguna oración junta "asesor comercial" (o "sales advisor") con Netlogistik (revisión 9).
+      const oraciones = INSTRUCCIONES_BASE.split(/(?<=[.!?])\s+|\n/);
+      const juntas = oraciones.filter((o) => /asesor comercial|sales advisor/i.test(o) && /Netlogistik/i.test(o));
+      expect(juntas).toEqual([]);
+    });
+
+    it('apertura cordial con la hora local y aviso de visibilidad amable', () => {
+      const apertura = seccion('### 3.1 Apertura', '### 3.2');
+      for (const t of ['Hora local del vendedor', 'Buenos días', 'espero que tu día vaya de maravilla', 'vamos a trabajar juntos en este negocio', 'tu asesor comercial', 'Good morning', "I'm your sales advisor", 'tu gerente y la dirección', '¿Cuál es el estatus del negocio?']) {
+        expect(apertura).toContain(t);
+      }
+      expect(apertura).toMatch(/nunca[^.]*"de Netlogistik"/i);
+      expect(apertura).toMatch(/Good morning\/Good afternoon\/Good evening/);
+      // Retorno: saludo cordial de una línea antes del resumen.
+      expect(apertura.slice(apertura.indexOf('**Retorno**'))).toMatch(/saludo cordial/i);
+    });
+
+    it('presunción por etapa y anti-redundancia en las reglas de conversación', () => {
+      const reglas = seccion('## 2. Reglas de conversación', '### Límites duros');
+      expect(reglas).toContain('Presunción por etapa');
+      expect(reglas).toContain('Una sola pregunta por mensaje');
+      expect(reglas).not.toContain('dos como máximo');
+      expect(reglas).toContain('ni con otras palabras');
+      expect(reglas).toContain('No pidas pruebas');
+      const preguntas = seccion('### 3.3 Preguntas', '### 3.4');
+      expect(preguntas).toMatch(/revisa el expediente/);
+    });
+
+    it('4.12 reemplazada: etapas, qué se da por hecho y en qué enfocarte', () => {
+      const f = fijo();
+      expect(f).not.toContain('pregunta por los criterios de las etapas anteriores a la del CRM');
+      const etapas = seccion('### 4.12 Etapas: qué se da por hecho y en qué enfocarte', '### 4.13');
+      for (const nombre of ['Identifying', 'Shaping & Discovery', 'Developing Proposal', 'Negotiating', 'Finalizing', 'Won']) {
+        expect(etapas).toContain(nombre);
+      }
+      for (const t of ['Se da por hecho', 'Foco', 'Coach', 'siguiente acción del cliente', 'última charla con el Coach', 'prevalida', 'Higiene de CRM']) {
+        expect(etapas).toContain(t);
+      }
+      // La lista de criterios por etapa sigue en el texto fijo.
+      expect(etapas).toContain('Para salir de 0 (Identifying)');
+    });
+
+    it('checklist de cierre de Finalizing en orden y con filtro', () => {
+      const checklist = seccion('Checklist de cierre', '### 4.12');
+      const pasos = [
+        '¿Ya te dijeron que eres el elegido?', '¿Ya enviaste el contrato?', '¿Ya revisaron el contrato?',
+        '¿Conoces el mecanismo para la Orden de Compra?', '¿Ya diste de alta al cliente?',
+        '¿El cliente ya te dio de alta como proveedor?', '¿el cliente ya te entregó la OC?', '¿Ya facturaste?',
+      ];
+      let previo = -1;
+      for (const p of pasos) {
+        const i = checklist.indexOf(p);
+        expect(i, p).toBeGreaterThan(previo);
+        previo = i;
+      }
+      expect(checklist).toMatch(/primer "no"/);
+      // Encuadre como afirmación y luego la pregunta 1 (revisión 5).
+      expect(checklist).toContain('"Si tu cierre es el <fecha del CRM>, validemos tu checklist de cierre. ¿Ya te dijeron que eres el elegido?"');
+      expect(checklist).not.toContain('¿ya hiciste el checklist');
+    });
+
+    it('4.11: con duda, pregunta solo en la etapa actual y el checklist', () => {
+      const cadena = seccion('### 4.11 Cadena de cierre', 'Checklist de cierre');
+      expect(cadena).not.toContain('con duda, pregunta.');
+      expect(cadena).toContain('Si tienes duda sobre un paso, pregunta solo cuando sea de la etapa actual o del checklist de cierre de Finalizing');
+      expect(cadena).toContain('no repreguntes un paso que el vendedor ya contestó');
+      expect(cadena).toContain('se preguntan una vez, cuando toque (en Finalizing, en el punto 4 del checklist de cierre)');
+    });
+
+    it('etapa 3: Assessment presumido y propuesta entregada como momento, no como prueba (revisión 2)', () => {
+      const etapas = seccion('### 4.12 Etapas', '### 4.13');
+      const e3 = etapas.slice(etapas.indexOf('- **3 Negotiating'), etapas.indexOf('- **4 Finalizing'));
+      expect(e3).toContain('Assessment presentado al Económico');
+      expect(e3).not.toMatch(/propuesta desarrollada y presentada al Económico/);
+      expect(e3).toContain('`propuesta_entregada`');
+      expect(e3).toContain('"¿Cómo te fue al presentarle la propuesta al Económico?"');
+      expect(e3).toMatch(/nunca[^.]*"¿Ya entregaste la propuesta\?"/i);
+      const e4 = etapas.slice(etapas.indexOf('- **4 Finalizing'), etapas.indexOf('- **5 Won'));
+      expect(e4).toMatch(/Se da por hecho:[^.]*propuesta entregada/);
+    });
+
+    it('nombres: una vez y, si no lo sabe, por cargo con "(nombre pendiente)"; Técnico solo ante contradicción (revisión 3)', () => {
+      const reglas = seccion('## 2. Reglas de conversación', '### Límites duros');
+      const r5 = reglas.slice(reglas.indexOf('5. **Nunca inventes datos.**'), reglas.indexOf('6. **'));
+      expect(r5).toContain('una sola vez');
+      expect(r5).toContain('"<cargo> (nombre pendiente)"');
+      const e = seccion('### 4.2', '### 4.3');
+      expect(e).not.toContain('¿Tú recomiendas o das el visto bueno final? ¿Alguien más puede vetarlo?');
+      expect(e).toContain('Solo si algo concreto contradice al vendedor');
+    });
+
+    it('ningún ejemplo entre comillas tiene más de una pregunta (revisión 4)', () => {
+      // Los ejemplos de lo que NO hay que hacer van entre «» y quedan fuera de esta comprobación.
+      const f = fijo();
+      const ejemplos = [...f.matchAll(/"([^"\n]*)"/g)].map((m) => m[1] ?? '');
+      expect(ejemplos.length).toBeGreaterThan(20);
+      const dobles = ejemplos.filter((t) => (t.match(/\?/g) ?? []).length > 1);
+      expect(dobles).toEqual([]);
+      // Tampoco listas de preguntas sueltas en una misma línea fuera de comillas (Budget, compelling event, higiene…).
+      const lineas = f.split('\n').filter((l) => !/^\d+\. /.test(l.trim()));
+      const conVarias = lineas.filter((l) => (l.replace(/"[^"\n]*"|«[^»\n]*»/g, '').match(/\?/g) ?? []).length > 1);
+      expect(conVarias).toEqual([]);
+      const alt = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'registrar_alternativa')?.description ?? '';
+      expect(alt).toContain('una sola pregunta');
+      expect(alt).not.toContain('pregunta si hay una solución interna, si el presupuesto se podría ir a otra cosa y si el cliente podría no hacer nada');
+    });
+  });
+
+  describe('ronda 2 de evals (2026-11-08.3)', () => {
+    const f = (): string => construir(opAlfa()).fijo;
+    const regla = (n: number): string => {
+      const t = f();
+      const i = t.indexOf(`${n}. **`, t.indexOf('## 2. Reglas de conversación'));
+      return t.slice(i, t.indexOf(`${n + 1}. **`, i));
+    };
+
+    it('una pregunta: regla 1 con opciones dentro de la misma pregunta, par mal/bien y revisión final', () => {
+      const r1 = regla(1);
+      expect(r1).toContain('exactamente un "?"');
+      expect(r1).toContain('"¿Quién libera el presupuesto: Héctor, el director general o el CFO?"');
+      expect(r1).toMatch(/Mal: «[^»]*\?[^»]*\?[^»]*»/);
+      expect(r1).toContain('el siguiente turno');
+      const ultima = f().trimEnd().split('\n').at(-1) ?? '';
+      expect(ultima).toContain('exactamente un "?"');
+      expect(ultima).toMatch(/opciones/);
+    });
+
+    it('idioma: el del último mensaje del vendedor; solo el resumen de cerrar_sesion en español; saludo por país', () => {
+      const r8 = regla(8);
+      expect(r8).toContain('idioma del último mensaje del vendedor');
+      expect(r8).toContain('aunque el contexto, los resultados de las herramientas y los resúmenes estén en español');
+      expect(r8).toMatch(/US/);
+      const revision = f().slice(f().lastIndexOf('## Antes de enviar'));
+      expect(revision).toContain('idioma del último mensaje del vendedor');
+    });
+
+    it('sin jerga interna y sin diagnóstico a media conversación', () => {
+      const t = f();
+      const jerga = t.slice(t.indexOf('10. **'), t.indexOf('### Límites duros'));
+      for (const x of ['motor', 'engine', 'ids de bandera', 'letras de rol', '"tu Coach está muy a favor"', '"la etapa en el CRM va adelantada"', 'cierre']) {
+        expect(jerga).toContain(x);
+      }
+      expect(t.slice(t.lastIndexOf('## Antes de enviar'))).toMatch(/jerga|motor/);
+    });
+
+    it('no registra como influencia una conjetura del vendedor (E2) y el nombre va sin cargo (E4)', () => {
+      const r5 = regla(5);
+      expect(r5).toContain('"creo que es el gerente general o los dueños"');
+      expect(r5).toMatch(/no registres una influencia/);
+      expect(r5).toContain('`cargo`');
+      expect(r5).toContain('`nombre` lleva solo el nombre');
+    });
+  });
+
+  it('contexto: idioma para responder (último mensaje del vendedor o país de la ficha)', () => {
+    expect(construir(opAlfa()).variable).toContain('Idioma de tus mensajes: español (el vendedor aún no escribe; país de la ficha MX)');
+    const us = crearOportunidad(fichaBase({ pais: 'US' }));
+    expect(construir(us).variable).toContain('Idioma de tus mensajes: inglés (el vendedor aún no escribe; país de la ficha US)');
+    const op = opAlfa();
+    op.sesionActual = {
+      modo: 'calificar', inicio: HOY, turnosVendedor: 1, versionInstrucciones: VERSION_INSTRUCCIONES, historial: [],
+      transcripcion: [
+        { rol: 'agente', texto: '¡Buenos días! ¿Cuál es el estatus del negocio?', fecha: HOY },
+        { rol: 'vendedor', texto: 'The client chose us and we are finishing the SOW with the team.', fecha: HOY },
+      ],
+    };
+    expect(construir(op).variable).toContain('Idioma de tus mensajes: inglés (último mensaje del vendedor)');
+  });
+
+  it('contexto: el cargo aparece junto a la influencia', () => {
+    const op = opAlfa();
+    op.expediente.influencias.push({
+      personaId: 'p-karina', nombre: 'Karina', cargo: 'Jefa de Planificación', roles: ['U'], grado: null, modo: null,
+      calificacion: null, contactada: true, nuevaEnPuesto: false, trDeclaracion: null, prioridad: null,
+    });
+    expect(construir(op).variable).toContain('- Karina (Jefa de Planificación) [id p-karina]');
+  });
+
+  it('contexto: criterios de la etapa actual y contradicciones de etapas anteriores', () => {
+    const op = opBeta(); // etapa 3
+    op.expediente.criteriosArgano.push(
+      { clave: 'propuesta_entregada', nivel: 'confirmado', fuente: 'Laura (CFO)' },
+      { clave: 'business_case_identificado', nivel: 'ausente' },
+    );
+    const { variable } = construir(op);
+    expect(variable).not.toContain('Criterios de Argano sin confirmar (etapas anteriores a la del CRM)');
+    expect(variable).toContain('Criterios de Argano de la etapa actual (3, para avanzar): ');
+    expect(variable).toMatch(/propuesta_entregada confirmado/);
+    expect(variable).toMatch(/pr_aprobado pendiente/);
+    expect(variable).toContain('Etapas 0 a 2: se dan por hechas (no se preguntan) · contradicciones registradas: business_case_identificado');
+    // Un "no sé" registrado mientras el CRM estaba en esa etapa no es contradicción (revisión 1).
+    const subio = opBeta();
+    subio.expediente.etapaCRM = 4;
+    subio.expediente.cadena.pasos.aElegido = true;
+    subio.expediente.criteriosArgano.push(
+      { clave: 'staffing_request', nivel: 'ausente', etapaRegistro: 3 },
+      { clave: 'entiende_cliente_dolores', nivel: 'ausente', etapaRegistro: 3 },
+    );
+    expect(construir(subio).variable).toContain('Etapas 0 a 3: se dan por hechas (no se preguntan) · contradicciones registradas: entiende_cliente_dolores\n');
+    const sinNada = construir(opAlfa()).variable; // etapa 2
+    expect(sinNada).toContain('Etapas 0 a 1: se dan por hechas (no se preguntan) · contradicciones registradas: ninguna');
+  });
+
   it('version', () => {
-    expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.4');
+    expect(VERSION_INSTRUCCIONES).toBe('2026-11-08.3');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
   });
 });

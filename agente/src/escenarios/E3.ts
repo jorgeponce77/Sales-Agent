@@ -36,7 +36,7 @@ COMPELLING EVENT: no sabes de uno. Sabes que es presupuesto del ejercicio fiscal
 
 CADENA DE CIERRE: el cliente no ha elegido proveedor (es una licitación abierta). Contrato no enviado. En licitaciones públicas el contrato y el SOW los firma el ganador tras el fallo: sí requiere SOW. No sabes si emiten orden de compra aparte. El alta de proveedor en el sistema de compras públicas: no la has iniciado.
 
-CRITERIOS DE ARGANO:
+CRITERIOS DE ARGANO (el agente no debería preguntarte por la etapa 0: la etapa 1 del CRM ya implica que ocurrió. Los de la etapa 1 son los de tu etapa actual):
 - Etapa 0 cumplida: fuente creíble (portal oficial de compras públicas); la entidad confirma que el proyecto es real (publicación oficial); alineada con la estrategia (la aprobó tu gerente, Ricardo Olvera, hace unas tres semanas, decisión de ir a concurso).
 - Etapa 1: RFP analizado y preguntas armadas: sí, documento de preguntas v1 revisado por preventa (Marisol Arteaga) hace una semana. Volumen aproximado: sí, está en el anexo técnico (5 almacenes y unas 18 mil posiciones); presupuesto aproximado: sí, suficiencia presupuestal en las bases. Aprobación de presupuesto del lado del cliente: consta en la constancia de suficiencia presupuestal que forma parte de las bases (no la confirmó ninguna persona). Revisión interna de calificación de Argano (go/no-go) aprobada por Ricardo Olvera hace unas tres semanas. Entiende al cliente y sus dolores: NO, solo por las bases. Business case del cliente: NO. El cliente invita formalmente a presentar propuesta: sí.
 - Etapa 2 en adelante: la respuesta al RFP todavía no está elaborada; nada más cumplido.

@@ -1,9 +1,10 @@
-import { crearOportunidad, ejecutarTurno, ESCENARIOS, iniciarSesion, validarFicha } from 'agente-sales-agent';
+import { crearOportunidad, ejecutarTurno, ESCENARIOS, horaLocalPorPais, iniciarSesion, validarFicha } from 'agente-sales-agent';
 import type { Ficha, ModoSesion, Oportunidad, OpcionesTurno } from 'agente-sales-agent';
 import { validarExpediente } from 'motor-sales-agent';
 import { obtenerCliente } from '../../../lib/clienteServidor';
 import { hoyMexico } from '../../../lib/hoy';
 import { ERROR_GENERICO, leerOportunidad, leerSolicitud, rechazar, recalcularDiagnostico, responder } from '../../../lib/leerSolicitud';
+import { horaEnZona, zonaValida } from '../../../lib/horaVendedor';
 import { resumenError } from '../../../lib/resumenError';
 import { esObjeto, MODOS } from '../../../lib/validarOportunidad';
 
@@ -79,6 +80,8 @@ export async function POST(req: Request): Promise<Response> {
       hoy,
       modelo: process.env.MODELO_AGENTE || undefined,
       limiteMs: LIMITE_TURNO_MS,
+      // Hora del vendedor para el saludo: la de su navegador si manda una zona válida; si no, la del país de la ficha.
+      horaLocal: zonaValida(cuerpo['zonaHoraria']) ? horaEnZona(cuerpo['zonaHoraria']) : horaLocalPorPais(oportunidad.ficha.pais),
       registrarError: (e) => console.error('[api/turno] fallo de la API', resumenError(e)),
     };
     const resultado = accion === 'iniciar'

@@ -1,4 +1,5 @@
 import { finDeTrimestre } from '../fechas.js';
+import { causaEtapaInflada } from './helpers.js';
 import type { Regla } from './tipos.js';
 
 /** Banderas críticas (spec §7.5): cualquiera de ellas limita el índice. */
@@ -45,7 +46,7 @@ export const REGLAS_CRITICAS: Regla[] = [
     lente: 'ambas',
     evaluar: (ctx) =>
       ctx.comparacion.diferencia >= 2
-        ? `La etapa del CRM está inflada ${ctx.comparacion.diferencia} etapas respecto a lo que sostienen los criterios (etapa ${ctx.etapaRec}).`
+        ? `La etapa del CRM está ${ctx.comparacion.diferencia} etapas por encima ${causaEtapaInflada(ctx)}.`
         : null,
   },
 ];

@@ -1,5 +1,6 @@
 import { estaAtorada, nivelEmbudo } from './embudo.js';
-import { compararEtapa, etapaRecomendada } from './etapa.js';
+import { compararEtapa, detalleEtapa } from './etapa.js';
+import type { LimiteEtapa } from './etapa.js';
 import { esFechaOptimista, evaluarFechaCierre } from './fechaCierre.js';
 import { lenteActiva } from './lente.js';
 import { clasificarTipo } from './oportunidad.js';
@@ -16,6 +17,8 @@ export interface Contexto {
   lente: Lente;
   tipo: TipoOportunidad;
   etapaRec: Etapa;
+  /** Qué limitó la etapa recomendada: criterios, proveedor elegido (paso a) o entregable de cierre. */
+  limiteEtapa: LimiteEtapa;
   comparacion: { resultado: 'al_dia' | 'inflada' | 'rezagada'; diferencia: number };
   /** Solo con lente director; con lente gerente es null. */
   fecha: ResultadoFecha | null;
@@ -45,7 +48,7 @@ function sanearFechas(exp: Expediente): Expediente {
 export function construirContexto(original: Expediente, hoy: string, config: Config): Contexto {
   const exp = sanearFechas(original);
   const lente = lenteActiva(exp, hoy);
-  const etapaRec = etapaRecomendada(exp, config);
+  const { etapa: etapaRec, limite: limiteEtapa } = detalleEtapa(exp, config);
   return {
     exp,
     hoy,
@@ -53,6 +56,7 @@ export function construirContexto(original: Expediente, hoy: string, config: Con
     lente,
     tipo: clasificarTipo(exp),
     etapaRec,
+    limiteEtapa,
     comparacion: compararEtapa(exp.etapaCRM, etapaRec),
     fecha: lente === 'director' ? evaluarFechaCierre(exp, hoy, config) : null,
     fechaOptimista: lente === 'gerente' ? esFechaOptimista(exp, hoy, config) : false,

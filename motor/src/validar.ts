@@ -146,6 +146,10 @@ export function validarExpediente(exp: Expediente): ErrorValidacion[] {
       raw['roles'].forEach((r, j) => revisarLista(`${campo}.roles[${j}]`, r, ROLES, false));
     }
     revisarFecha(`${campo}.ultimoContacto`, raw['ultimoContacto']);
+    const cargo = raw['cargo'];
+    if (cargo !== undefined && (typeof cargo !== 'string' || cargo.length > 120)) {
+      error(`${campo}.cargo`, 'El cargo debe ser texto de máximo 120 caracteres');
+    }
   });
 
   // Alternativas
@@ -192,6 +196,10 @@ export function validarExpediente(exp: Expediente): ErrorValidacion[] {
     const fuente = raw['fuente'];
     if (fuente !== undefined && (typeof fuente !== 'string' || fuente.length > MAX_FUENTE_CRITERIO)) {
       error(`${campo}.fuente`, `La fuente debe ser texto de máximo ${MAX_FUENTE_CRITERIO} caracteres`);
+    }
+    const etapaRegistro = raw['etapaRegistro'];
+    if (etapaRegistro !== undefined && (!Number.isInteger(etapaRegistro) || (etapaRegistro as number) < 0 || (etapaRegistro as number) > 8)) {
+      error(`${campo}.etapaRegistro`, 'La etapa de registro debe ser un entero de 0 a 8');
     }
   });
 

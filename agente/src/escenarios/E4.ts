@@ -43,7 +43,7 @@ COMPELLING EVENT: no hay uno confirmado. Karina te dijo que los contratos de dos
 
 CADENA DE CIERRE: el cliente no ha elegido proveedor; no hay contrato. No sabes si requiere SOW ni cómo compran. No has hablado del alta de proveedor.
 
-CRITERIOS DE ARGANO:
+CRITERIOS DE ARGANO (el agente no debería preguntarte por las etapas 0 y 1: la etapa 2 del CRM ya implica que ocurrieron. Pero cuando sale el presupuesto y reconoces que la partida es del piloto de TI, eso contradice la etapa 1: si el agente te pregunta si el cliente aprobó presupuesto para esta propuesta, dices que no):
 - Etapa 0 cumplida: lead de una referencia de otro cliente del grupo (fuente creíble); Paredes confirmó que el proyecto es real; alineada con la estrategia (la aprobó tu gerente, Fernando Ríos, hace unos cuatro meses).
 - Etapa 1 (falta un criterio): entiendes al cliente y los dolores (Karina y Paredes); volumen conocido y presupuesto aproximado conocido (la partida de unos 300 mil dólares); el business case del cliente es reducir sobrepersonal y multas; Paredes pidió una propuesta "para compararla". NO está cumplida la aprobación de presupuesto del lado del cliente: la única partida está asignada al piloto de TI y Paredes quiere la propuesta solo para comparar; la revisión interna de calificación de Argano sí la aprobó Fernando Ríos hace unos tres meses, pero sin presupuesto del cliente el criterio no se cumple.
 - Etapa 2: propuesta desarrollada (versión 1, entregada hace unas seis semanas): sí. Requerimientos refinados: NO, porque TI no ha compartido muestras de datos. Los demás criterios de la etapa no los has trabajado.

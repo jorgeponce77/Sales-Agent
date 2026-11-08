@@ -232,7 +232,10 @@ export const registrarCriterioArgano: Herramienta = segura('registrar_criterio_a
   const descripcion = `${esLote ? 'Criterios de Argano' : 'Criterio de Argano'}: ${criterios.map(describirCriterio).join('; ')}`;
 
   return aplicarEscritura(estado, descripcion, (exp) => {
-    for (const nuevo of criterios) {
+    // La etapa del CRM al registrar: con ella el motor distingue un "no sé" de la etapa en curso (que no
+    // infla la etapa cuando el CRM sube) de una contradicción de una etapa ya pasada.
+    for (const sinEtapa of criterios) {
+      const nuevo: CriterioCumplido = { ...sinEtapa, etapaRegistro: exp.etapaCRM };
       const i = exp.criteriosArgano.findIndex((c) => c.clave === nuevo.clave);
       if (i >= 0) exp.criteriosArgano[i] = nuevo;
       else exp.criteriosArgano.push(nuevo);
@@ -245,7 +248,7 @@ export const registrarCriterioArgano: Herramienta = segura('registrar_criterio_a
 // ---------------------------------------------------------------------------
 
 const CAMPOS_INFLUENCIA = [
-  'roles', 'grado', 'modo', 'calificacion', 'contactada', 'ultimoContacto',
+  'cargo', 'roles', 'grado', 'modo', 'calificacion', 'contactada', 'ultimoContacto',
   'nuevaEnPuesto', 'trDeclaracion', 'prioridad',
 ] as const;
 
@@ -269,6 +272,9 @@ export const registrarInfluencia: Herramienta = segura('registrar_influencia', (
 
   return aplicarEscritura(estado, `Influencia ${etiqueta}`, (exp) => {
     if (presente(input, 'contactada') && typeof input['contactada'] !== 'boolean') throw new Error('contactada: debe ser verdadero o falso');
+    if (presente(input, 'cargo') && (typeof input['cargo'] !== 'string' || input['cargo'].length > MAX_NOMBRE_INFLUENCIA)) {
+      throw new Error(`cargo: debe ser texto de máximo ${MAX_NOMBRE_INFLUENCIA} caracteres`);
+    }
     if (presente(input, 'nuevaEnPuesto') && typeof input['nuevaEnPuesto'] !== 'boolean') throw new Error('nuevaEnPuesto: debe ser verdadero o falso');
     const tr = input['trDeclaracion'];
     if (tr !== undefined && tr !== null && typeof tr !== 'string') throw new Error('trDeclaracion: debe ser texto o null');
@@ -281,6 +287,8 @@ export const registrarInfluencia: Herramienta = segura('registrar_influencia', (
     }
 
     if (existente) {
+      // Con personaId, un nombre distinto lo reemplaza (p. ej. "<cargo> (nombre pendiente)" → el nombre real).
+      if (typeof personaId === 'string' && typeof nombre === 'string' && existente.personaId === personaId) existente.nombre = nombre;
       for (const k of cambios) (existente as unknown as Obj)[k] = input[k];
       return;
     }

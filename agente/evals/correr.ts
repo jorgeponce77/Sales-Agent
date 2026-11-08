@@ -8,11 +8,12 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  crearClienteAnthropic, crearOportunidad, ejecutarTurno, ESCENARIOS, hoyEnMexico, iniciarSesion, MODELO_DEFAULT,
+  crearClienteAnthropic, crearOportunidad, ejecutarTurno, ESCENARIOS, horaLocalPorPais, hoyEnMexico, iniciarSesion,
+  MODELO_DEFAULT,
 } from '../src/index.js';
 import type { ClienteModelo, Escenario, Mensaje, Oportunidad, OpcionesTurno, ResultadoTurno, Uso } from '../src/index.js';
 import { interpretarRespuestaVendedor, responderComoVendedor } from './vendedorSimulado.js';
-import { verificar } from './verificaciones.js';
+import { mensajesHastaDiagnostico, verificar } from './verificaciones.js';
 import type { Verificacion } from './verificaciones.js';
 
 const RUTA_CLAVE = '/home/claude/.secrets/anthropic_key';
@@ -97,14 +98,16 @@ async function correrEscenario(
 ): Promise<ResultadoEscenario> {
   const usoAgente = usoCero();
   const usoVendedor = usoCero();
+  let op = crearOportunidad(esc.construirFicha(args.hoy));
   const opciones: OpcionesTurno = {
     cliente, hoy: args.hoy, modelo: modeloAgente,
+    // Como en la web: hora del vendedor en la zona del país de la ficha, para el saludo.
+    horaLocal: horaLocalPorPais(op.ficha.pais),
     registrarError: (e) => {
       const x = e as { name?: unknown; status?: unknown; message?: unknown } | null;
       console.error(limpiar(`  error de API: ${String(x?.name)} status=${String(x?.status)} ${String(x?.message)}`));
     },
   };
-  let op = crearOportunidad(esc.construirFicha(args.hoy));
   let error: string | null = null;
   let turnosUsados = 0;
 
@@ -177,10 +180,11 @@ function informe(r: ResultadoEscenario, args: Argumentos, modeloAgente: string, 
     '',
     '## Informativo (no es una verificación)',
     '',
+    `- Mensajes del agente hasta el diagnóstico: ${mensajesHastaDiagnostico(r.op).detalle}`,
     `- Influencias registradas con rol E: ${influenciasE.length > 0 ? influenciasE.join(', ') : 'ninguna'}.`,
     d === null
       ? '- Diagnóstico: ninguno.'
-      : `- Diagnóstico: semáforo ${d.indice.semaforo}, índice ${d.indice.total}/100, banderas: ${d.banderas.map((b) => b.id).join(', ') || 'ninguna'}.`,
+      : `- Diagnóstico: semáforo ${d.indice.semaforo}, índice ${d.indice.total}/100, etapa CRM ${d.etapaCRM} vs. recomendada ${d.etapaRecomendada} (${d.comparacionEtapa}), banderas: ${d.banderas.map((b) => b.id).join(', ') || 'ninguna'}.`,
     '',
     '## Uso de tokens',
     '',
@@ -215,6 +219,7 @@ async function main(): Promise<number> {
     sumar(totalVendedor, r.usoVendedor);
     if (r.error !== null) console.log(`  ❌ error: ${r.error}`);
     for (const v of r.verificaciones) console.log(`  ${marca(v.ok)} ${v.nombre}: ${v.detalle}`);
+    console.log(`  ℹ️ ${mensajesHastaDiagnostico(r.op).detalle}`);
     console.log(`  informe: ${archivo}`);
     if (fallo(r)) fallaron += 1;
   }

@@ -56,8 +56,9 @@ const CASOS: Caso[] = [
   },
   {
     id: 'etapa_inflada_grave',
-    activa: expedienteBase({ etapaCRM: 2 }),
-    noActiva: expedienteBase({ etapaCRM: 1 }),
+    // Presunción por etapa: solo una contradicción (criterio anterior en ausente) baja la recomendada.
+    activa: expedienteBase({ etapaCRM: 2, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] }),
+    noActiva: expedienteBase({ etapaCRM: 2 }),
   },
   {
     id: 'bant_supuesto',
@@ -92,8 +93,8 @@ const CASOS: Caso[] = [
   },
   {
     id: 'etapa_inflada',
-    activa: expedienteBase({ etapaCRM: 1 }),
-    noActiva: expedienteBase({ etapaCRM: 0 }),
+    activa: expedienteBase({ etapaCRM: 1, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] }),
+    noActiva: expedienteBase({ etapaCRM: 1 }),
   },
   {
     id: 'banco_una_pata',
@@ -262,7 +263,24 @@ describe('condiciones de borde', () => {
   });
 
   it('etapa_inflada_no_se_activa_con_diferencia_de_dos', () => {
-    expect(evaluar('etapa_inflada', expedienteBase({ etapaCRM: 2 }))).toBeNull();
+    const exp = expedienteBase({ etapaCRM: 2, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] });
+    expect(evaluar('etapa_inflada_grave', exp)).not.toBeNull();
+    expect(evaluar('etapa_inflada', exp)).toBeNull();
+  });
+
+  it('texto de etapa inflada cuando la causa es solo que el cliente no nos ha elegido (revisión 7)', () => {
+    const porElegido = evaluar('etapa_inflada', expedienteBase({ etapaCRM: 4, cadena: { pasos: { aElegido: false } } }));
+    expect(porElegido).toMatch(/no nos ha elegido/);
+    expect(porElegido).not.toMatch(/sostienen los criterios/);
+    const graveElegido = evaluar('etapa_inflada_grave', expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: false } } }));
+    expect(graveElegido).toMatch(/no nos ha elegido/);
+    expect(graveElegido).not.toMatch(/sostienen los criterios/);
+    // Por criterios contradichos, el texto sigue hablando de criterios.
+    const porCriterios = evaluar('etapa_inflada', expedienteBase({ etapaCRM: 1, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] }));
+    expect(porCriterios).toMatch(/sostienen los criterios/);
+    // CRM 5 elegido pero sin OC ni contrato firmado: el texto lo dice.
+    const sinEntregable = evaluar('etapa_inflada', expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: true } } }));
+    expect(sinEntregable).toMatch(/orden de compra ni contrato firmado/);
   });
 
   it('banco_una_pata_no_se_activa_sin_contactadas', () => {

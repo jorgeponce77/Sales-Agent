@@ -1,7 +1,9 @@
-import { CATALOGO_REGLAS, CONFIG_DEFAULT, construirContexto } from 'motor-sales-agent';
+import { CATALOGO_REGLAS, CONFIG_DEFAULT, construirContexto, contradiccionesPrevias } from 'motor-sales-agent';
 import type { Diagnostico, Evidencia, Expediente, Influencia } from 'motor-sales-agent';
 import type { ModoSesion, Oportunidad } from '../tipos.js';
-import { INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from './base.js';
+import { saludoPorHora } from '../fechas.js';
+import { idiomaDelVendedor } from '../idioma.js';
+import { ANTES_DE_ENVIAR, INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from './base.js';
 
 /** Qué significa cada bandera del motor, para que el agente la explique sin recalcularla. */
 const SIGNIFICADO: Readonly<Record<string, string>> = {
@@ -57,7 +59,8 @@ const CATALOGO_BANDERAS = [
 ].join('\n');
 
 /** Parte fija: idéntica para toda oportunidad y modo (se cachea). */
-const FIJO = `${INSTRUCCIONES_BASE}\n\n${CATALOGO_BANDERAS}\n`;
+// La revisión antes de enviar va al final, donde el modelo la ve justo antes de escribir.
+const FIJO = `${INSTRUCCIONES_BASE}\n\n${CATALOGO_BANDERAS}\n\n${ANTES_DE_ENVIAR}\n`;
 
 // ---------------------------------------------------------------------------
 // Parte variable
@@ -79,7 +82,7 @@ function ev(e: Evidencia<unknown>): string {
 
 function lineaInfluencia(i: Influencia): string {
   const partes = [
-    `${i.nombre} [id ${i.personaId}]`,
+    `${i.nombre}${i.cargo ? ` (${recortar(i.cargo)})` : ''} [id ${i.personaId}]`,
     i.roles.length > 0 ? i.roles.join(',') : 'sin rol',
     `grado ${i.grado ?? '?'}`,
     `modo ${i.modo ?? '?'}`,
@@ -92,14 +95,30 @@ function lineaInfluencia(i: Influencia): string {
   return `- ${partes.join(' · ')}`;
 }
 
-/** Criterios de Argano aún no confirmados en las etapas que el CRM ya dice haber pasado. */
-function criteriosPendientes(exp: Expediente): string {
-  const confirmados = new Set(exp.criteriosArgano.filter((c) => c.nivel === 'confirmado').map((c) => c.clave));
-  const pendientes = CONFIG_DEFAULT.criteriosArgano
-    .filter((c) => c.etapaDesde < exp.etapaCRM && (!c.soloRFP || exp.esRFP) && !confirmados.has(c.clave))
-    .map((c) => c.clave);
-  if (exp.etapaCRM === 0) return 'no aplica (etapa 0)';
-  return pendientes.length === 0 ? 'todos confirmados' : pendientes.join(', ');
+/**
+ * Criterios de Argano según la presunción por etapa: los de la etapa actual (lo que falta para avanzar), con su
+ * nivel, y las contradicciones registradas (`ausente`) en las etapas anteriores, que se dan por hechas.
+ */
+function lineasCriterios(exp: Expediente): string[] {
+  const aplica = (c: { soloRFP?: boolean }): boolean => !c.soloRFP || exp.esRFP;
+  const nivel = new Map(exp.criteriosArgano.map((c) => [c.clave, c.nivel]));
+  const actuales = CONFIG_DEFAULT.criteriosArgano
+    .filter((c) => c.etapaDesde === exp.etapaCRM && aplica(c))
+    .map((c) => `${c.clave} ${nivel.get(c.clave) ?? 'pendiente'}`);
+  // Solo contradicciones reales: un "no sé" registrado con el CRM en esa misma etapa no cuenta (motor).
+  const contradicciones = contradiccionesPrevias(exp, CONFIG_DEFAULT);
+  const lineas = [
+    actuales.length > 0
+      ? `Criterios de Argano de la etapa actual (${exp.etapaCRM}, para avanzar): ${actuales.join(', ')}`
+      : `Criterios de Argano de la etapa actual (${exp.etapaCRM}): no aplica (falta el entregable de cierre si no está)`,
+  ];
+  if (exp.etapaCRM > 0) {
+    const previas = exp.etapaCRM === 1 ? 'Etapa 0' : `Etapas 0 a ${exp.etapaCRM - 1}`;
+    lineas.push(
+      `${previas}: se dan por hechas (no se preguntan) · contradicciones registradas: ${contradicciones.length > 0 ? contradicciones.join(', ') : 'ninguna'}`,
+    );
+  }
+  return lineas;
 }
 
 function bloqueExpediente(exp: Expediente, diag: Diagnostico): string[] {
@@ -128,7 +147,7 @@ function bloqueExpediente(exp: Expediente, diag: Diagnostico): string[] {
     `Prioridad: ${ev(exp.prioridad)} · Sensación del vendedor: ${exp.sensacion ?? '?'} · Reorganización: ${ev(exp.reorganizacion)}`,
     `Competencia: pregunta hecha ${siNo(exp.preguntaCompetenciaHecha)} · alternativas: ${alternativas.length > 0 ? alternativas.join('; ') : 'ninguna'} · contribución diferenciadora ${ev(exp.contribucionDiferenciadora)} · criterios de compra definidos ${siNo(exp.criteriosCompraDefinidos)}`,
     `Cadena de cierre: ruta ${cadena.ruta} · requiere SOW ${siNo(cadena.requiereSOW)} · pasos cumplidos: ${pasos.length > 0 ? pasos.join(', ') : 'ninguno'}`,
-    `Criterios de Argano sin confirmar (etapas anteriores a la del CRM): ${criteriosPendientes(exp)}`,
+    ...lineasCriterios(exp),
     `Higiene de CRM: valores ${siNo(exp.higieneCRM.valores)} · actividades ${siNo(exp.higieneCRM.actividades)} · etapas ${siNo(exp.higieneCRM.etapas)}`,
   ];
 }
@@ -175,15 +194,41 @@ function bloqueSesiones(op: Oportunidad): string[] {
 }
 
 /**
+ * Idioma en que el agente debe escribir: el del último mensaje reconocible del vendedor; si el vendedor aún no
+ * ha escrito (primer saludo), inglés solo si la ficha es de US.
+ */
+function lineaIdioma(op: Oportunidad): string {
+  const escribio = [...(op.sesionActual?.transcripcion ?? []), ...op.sesiones.flatMap((s) => s.transcripcion ?? [])]
+    .some((m) => m.rol === 'vendedor');
+  if (!escribio) {
+    const idioma = op.ficha.pais.trim().toUpperCase() === 'US' ? 'inglés' : 'español';
+    return `Idioma de tus mensajes: ${idioma} (el vendedor aún no escribe; país de la ficha ${op.ficha.pais})`;
+  }
+  return `Idioma de tus mensajes: ${idiomaDelVendedor(op) === 'en' ? 'inglés' : 'español'} (último mensaje del vendedor)`;
+}
+
+const SALUDO_EN = { 'buenos días': 'Good morning', 'buenas tardes': 'Good afternoon', 'buenas noches': 'Good evening' } as const;
+
+/** Línea de hora local y saludo para la apertura; sin una hora válida (entero 0–23), saludo neutro. */
+function lineaHoraLocal(horaLocal: number | undefined): string {
+  if (horaLocal === undefined || !Number.isInteger(horaLocal) || horaLocal < 0 || horaLocal > 23) {
+    return 'Hora local del vendedor: desconocida → saludo neutro ("Hola, …"; en inglés, "Hi, …")';
+  }
+  return `Hora local del vendedor: ${String(horaLocal).padStart(2, '0')} h → saludo: ${saludoPorHora(horaLocal)} (en inglés: ${SALUDO_EN[saludoPorHora(horaLocal)]})`;
+}
+
+/**
  * Instrucciones para un turno: `fijo` (el system, cacheable, igual para toda oportunidad) y `variable`
  * (hoy, modo, lente, ficha, expediente resumido, diagnóstico y memoria), que va en el mensaje del turno.
- * `diag` es el diagnóstico vigente, calculado al inicio del turno.
+ * `diag` es el diagnóstico vigente, calculado al inicio del turno. `horaLocal` (0–23) es la hora del
+ * vendedor para el saludo; va solo en la parte variable.
  */
 export function construirInstrucciones(
   op: Oportunidad,
   modo: ModoSesion,
   hoy: string,
   diag: Diagnostico,
+  horaLocal?: number,
 ): { fijo: string; variable: string; version: string } {
   const { lente } = construirContexto(op.expediente, hoy, CONFIG_DEFAULT);
   const f = op.ficha;
@@ -195,6 +240,8 @@ export function construirInstrucciones(
   const lineas = [
     `Hoy: ${hoy} · Modo: ${modo} · Lente: ${lente}`,
     `Sesión: ${sesion}${mensajes}`,
+    lineaHoraLocal(horaLocal),
+    lineaIdioma(op),
     `Ficha (CRM): ${f.idCRM} · ${f.cliente} · ${f.oportunidad} · ${f.pais} · ${f.lineas.join('+')} · tipo ${f.tipo ?? 'sin dato'} · etapa ${f.etapaCRM} · TCV ${f.tcv} ${f.moneda} · creada ${f.fechaCreacion} · cierre ${f.fechaCierreCRM} · RFP ${siNo(f.esRFP)} · prob. CRM ${f.probabilidadCRM === null ? '?' : `${f.probabilidadCRM}%`} · últ. act. CRM ${f.ultimaActualizacionCRM ?? '?'}`,
     '',
     ...bloqueExpediente(op.expediente, diag),
