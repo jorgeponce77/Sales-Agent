@@ -10,6 +10,7 @@ import type { AlmacenUso } from '../lib/usoSesion';
 import Chat from './Chat';
 import type { BloqueConversacion } from './Chat';
 import FichaNueva from './FichaNueva';
+import Metricas from './Metricas';
 import type { DatosFicha } from './FichaNueva';
 import PanelDiagnostico from './PanelDiagnostico';
 import TarjetaPapel from './TarjetaPapel';
@@ -279,6 +280,16 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
     }]),
   ];
 
+  const nombreCabecera = esNueva ? 'Nueva oportunidad' : actual?.ficha.cliente ?? escenario?.titulo ?? 'Sin oportunidad';
+  const lineasCabecera = esNueva || actual === null ? '' : actual.ficha.lineas.join(' · ');
+  const panelRef = useRef<HTMLElement>(null);
+
+  /** Tocar las métricas abre el panel completo y lo trae a la vista. */
+  function abrirPanel(): void {
+    setPanelAbierto(true);
+    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }
+
   const cerrada = actual?.cerrada === true;
   const sesionAbierta = sesion !== null && !cerrada;
   const puedeIniciar = listo && !ocupado && !cerrada && sesion === null && (actual !== null || escenario !== undefined);
@@ -290,7 +301,14 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
   return (
     <main className="lab">
       <header className="lab-encabezado">
-        <h1>Laboratorio de pruebas</h1>
+        <div className="lab-encabezado-int">
+          <h1 className="lab-marca">Laboratorio de pruebas</h1>
+          <div className="lab-cliente">
+            <span className="lab-cliente-nombre">{nombreCabecera}</span>
+            {lineasCabecera !== '' && <span className="lab-cliente-linea">{lineasCabecera}</span>}
+          </div>
+          {!esNueva && <Metricas oportunidad={actual} onAbrir={abrirPanel} />}
+        </div>
       </header>
 
       {estadoAlmacen === 'formato_incompatible' && (
@@ -402,7 +420,7 @@ export default function Laboratorio({ escenarios }: { escenarios: EscenarioVista
             motivo={motivoChat}
             onEnviar={enviarMensaje}
           />
-          <aside className="panel" data-abierto={panelAbierto} aria-label="Diagnóstico">
+          <aside className="panel" ref={panelRef} data-abierto={panelAbierto} aria-label="Diagnóstico">
             {escritorio ? (
               <h2 className="panel-titulo-fijo">Diagnóstico</h2>
             ) : (

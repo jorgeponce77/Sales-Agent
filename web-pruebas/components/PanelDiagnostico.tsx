@@ -3,7 +3,7 @@ import type { Oportunidad } from 'agente-sales-agent';
 import { avisoTipoCambio } from '../lib/avisos';
 import { etiquetaEtapa } from '../lib/catalogos';
 
-const SEMAFORO = {
+export const SEMAFORO = {
   verde: 'Verde',
   ambar: 'Ámbar',
   rojo: 'Rojo',
@@ -11,7 +11,7 @@ const SEMAFORO = {
 
 const COMPARACION = { al_dia: 'al día', inflada: 'inflada', rezagada: 'rezagada' } as const;
 
-const VEREDICTO = {
+export const VEREDICTO = {
   creible: 'Creíble',
   en_riesgo: 'En riesgo',
   no_cierra_fecha: 'No cierra en la fecha',

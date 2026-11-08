@@ -28,8 +28,8 @@ function Burbuja({ m }: { m: Mensaje }) {
   const propio = m.rol === 'vendedor';
   return (
     <li className={`burbuja ${propio ? 'burbuja-propia' : 'burbuja-agente'}`}>
-      <span className="solo-lectores">{propio ? 'Tú: ' : 'Agente: '}</span>
-      {m.texto}
+      {propio ? <span className="solo-lectores">Tú: </span> : <span className="etiqueta-agente">Asesor comercial</span>}
+      {propio ? m.texto : <span>{m.texto}</span>}
     </li>
   );
 }
@@ -91,7 +91,7 @@ export default function Chat({ bloques, pendiente, pensando, puedeEscribir, moti
         {(pendiente !== null || pensando) && (
           <ul className="burbujas">
             {pendiente !== null && <Burbuja m={{ rol: 'vendedor', texto: pendiente, fecha: '' }} />}
-            {pensando && <li className="burbuja burbuja-agente burbuja-pensando">pensando…</li>}
+            {pensando && <li className="burbuja burbuja-agente burbuja-pensando"><span className="etiqueta-agente">Asesor comercial</span><span>pensando…</span></li>}
           </ul>
         )}
         {!puedeEscribir && !pensando && <p className="chat-nota">{motivo}</p>}
@@ -107,7 +107,7 @@ export default function Chat({ bloques, pendiente, pensando, puedeEscribir, moti
         <textarea
           id="mensaje-vendedor"
           ref={campo}
-          rows={2}
+          rows={1}
           maxLength={MAX_MENSAJE}
           value={borrador}
           disabled={deshabilitado}
