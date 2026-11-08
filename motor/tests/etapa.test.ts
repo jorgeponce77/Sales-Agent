@@ -68,6 +68,65 @@ describe('etapaRecomendada', () => {
   });
 });
 
+describe('etapaRecomendada — presunción por etapa (George, 8-nov-2026)', () => {
+  it('crm_3_sin_criterios_registrados_queda_al_dia', () => {
+    expect(etapaRecomendada(expedienteBase({ etapaCRM: 3 }), CONFIG_DEFAULT)).toBe(3);
+  });
+
+  it('crm_3_con_criterio_de_etapa_1_ausente_baja_a_1', () => {
+    const exp = expedienteBase({
+      etapaCRM: 3,
+      criteriosArgano: [{ clave: 'confirma_recibir_propuesta', nivel: 'ausente' }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(1);
+  });
+
+  it('crm_4_sin_proveedor_elegido_baja_a_3', () => {
+    const exp = expedienteBase({ etapaCRM: 4, cadena: { pasos: { aElegido: false } } });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(3);
+  });
+
+  it('crm_4_con_proveedor_elegido_queda_al_dia', () => {
+    const exp = expedienteBase({ etapaCRM: 4, cadena: { pasos: { aElegido: true } } });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(4);
+  });
+
+  it('criterio_supuesto_de_etapa_anterior_cuenta_como_presumido', () => {
+    const exp = expedienteBase({
+      etapaCRM: 2,
+      criteriosArgano: [{ clave: 'business_case_identificado', nivel: 'supuesto' }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(2);
+  });
+
+  it('etapa_actual_y_siguientes_siguen_exigiendo_confirmado', () => {
+    // CRM 2: los de la etapa 2 en supuesto no permiten recomendar 3.
+    const supuestos = criteriosHasta(2, 'supuesto', ['rfp_analizado', 'rfp_respuesta']).filter(
+      (c) => CONFIG_DEFAULT.criteriosArgano.find((k) => k.clave === c.clave)?.etapaDesde === 2,
+    );
+    expect(etapaRecomendada(expedienteBase({ etapaCRM: 2, criteriosArgano: supuestos }), CONFIG_DEFAULT)).toBe(2);
+    // Confirmados, sí: el CRM queda rezagado.
+    const confirmados = supuestos.map((c) => ({ ...c, nivel: 'confirmado' as Nivel }));
+    expect(etapaRecomendada(expedienteBase({ etapaCRM: 2, criteriosArgano: confirmados }), CONFIG_DEFAULT)).toBe(3);
+  });
+
+  it('criterio_soloRFP_ausente_no_cuenta_si_no_es_rfp', () => {
+    const exp = expedienteBase({
+      etapaCRM: 3,
+      esRFP: false,
+      criteriosArgano: [{ clave: 'rfp_analizado', nivel: 'ausente' }],
+    });
+    expect(etapaRecomendada(exp, CONFIG_DEFAULT)).toBe(3);
+  });
+
+  it('crm_5_sin_entregable_de_cierre_baja_a_4', () => {
+    const sinEntregable = expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: true } } });
+    expect(etapaRecomendada(sinEntregable, CONFIG_DEFAULT)).toBe(4);
+    const firmado = expedienteBase({ etapaCRM: 5, cadena: { pasos: { aElegido: true, eFirmado: true } } });
+    expect(etapaRecomendada(firmado, CONFIG_DEFAULT)).toBe(5);
+  });
+});
+
 describe('entregableCierre', () => {
   const caso = (requiereSOW: boolean | null, pasos: { eFirmado?: boolean; hOC?: boolean }) =>
     entregableCierre(expedienteBase({ cadena: { requiereSOW, pasos } }));

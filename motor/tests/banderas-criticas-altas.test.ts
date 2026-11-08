@@ -56,8 +56,9 @@ const CASOS: Caso[] = [
   },
   {
     id: 'etapa_inflada_grave',
-    activa: expedienteBase({ etapaCRM: 2 }),
-    noActiva: expedienteBase({ etapaCRM: 1 }),
+    // Presunción por etapa: solo una contradicción (criterio anterior en ausente) baja la recomendada.
+    activa: expedienteBase({ etapaCRM: 2, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] }),
+    noActiva: expedienteBase({ etapaCRM: 2 }),
   },
   {
     id: 'bant_supuesto',
@@ -92,8 +93,8 @@ const CASOS: Caso[] = [
   },
   {
     id: 'etapa_inflada',
-    activa: expedienteBase({ etapaCRM: 1 }),
-    noActiva: expedienteBase({ etapaCRM: 0 }),
+    activa: expedienteBase({ etapaCRM: 1, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] }),
+    noActiva: expedienteBase({ etapaCRM: 1 }),
   },
   {
     id: 'banco_una_pata',
@@ -262,7 +263,9 @@ describe('condiciones de borde', () => {
   });
 
   it('etapa_inflada_no_se_activa_con_diferencia_de_dos', () => {
-    expect(evaluar('etapa_inflada', expedienteBase({ etapaCRM: 2 }))).toBeNull();
+    const exp = expedienteBase({ etapaCRM: 2, criteriosArgano: [{ clave: 'cliente_confirma_real', nivel: 'ausente' }] });
+    expect(evaluar('etapa_inflada_grave', exp)).not.toBeNull();
+    expect(evaluar('etapa_inflada', exp)).toBeNull();
   });
 
   it('banco_una_pata_no_se_activa_sin_contactadas', () => {

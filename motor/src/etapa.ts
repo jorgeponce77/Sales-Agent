@@ -10,19 +10,34 @@ export function entregableCierre(exp: Expediente): boolean {
 }
 
 /**
- * Etapa que sostienen los criterios de Argano confirmados: se avanza etapa por etapa
- * mientras todos los criterios requeridos estén en nivel 'confirmado'.
+ * Etapa que sostienen los criterios de Argano: se avanza etapa por etapa mientras los
+ * criterios requeridos de cada etapa se den por cumplidos.
+ *
+ * Presunción por etapa (George, 8-nov-2026): la etapa del CRM implica que lo de las etapas
+ * anteriores ya ocurrió. Para cada etapa d < etapaCRM, sus criterios se **presumen cumplidos**
+ * salvo que alguno esté registrado en `ausente` (contradicción dicha por el vendedor); un
+ * `supuesto` también cuenta como presumido. Para d ≥ etapaCRM (la actual y las siguientes) se
+ * exige `confirmado`, así que solo se recomienda por encima del CRM con evidencia del cliente.
+ * Se mantienen las compuertas duras: pasar a ≥4 exige proveedor elegido (paso a) y la 5 exige
+ * entregable de cierre, también por debajo de la etapa del CRM.
  */
 export function etapaRecomendada(exp: Expediente, config: Config): Etapa {
   const confirmados = new Set(
     exp.criteriosArgano.filter((c) => c.nivel === 'confirmado').map((c) => c.clave),
+  );
+  const ausentes = new Set(
+    exp.criteriosArgano.filter((c) => c.nivel === 'ausente').map((c) => c.clave),
   );
   let k = 0;
   for (let d = 0; d <= 4; d++) {
     const requeridos = config.criteriosArgano.filter(
       (c) => c.etapaDesde === d && (!c.soloRFP || exp.esRFP),
     );
-    if (!requeridos.every((c) => confirmados.has(c.clave))) break;
+    const cumplido =
+      d < exp.etapaCRM
+        ? (clave: string) => !ausentes.has(clave)
+        : (clave: string) => confirmados.has(clave);
+    if (!requeridos.every((c) => cumplido(c.clave))) break;
     // Pasar a ≥4 exige proveedor elegido.
     if (d === 3 && !exp.cadena.pasos.aElegido) break;
     k = d + 1;

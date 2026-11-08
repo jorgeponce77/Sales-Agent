@@ -197,8 +197,9 @@ describe('construirContexto', () => {
     expect(ctx.hoy).toBe(HOY);
     expect(ctx.config).toBe(CONFIG_DEFAULT);
     expect(ctx.tipo).toBe('EN');
-    expect(ctx.etapaRec).toBe(0);
-    expect(ctx.comparacion).toEqual({ resultado: 'inflada', diferencia: 2 });
+    // Presunción por etapa: sin contradicciones, las etapas anteriores a la del CRM se dan por cumplidas.
+    expect(ctx.etapaRec).toBe(2);
+    expect(ctx.comparacion).toEqual({ resultado: 'al_dia', diferencia: 0 });
     expect(ctx.atorada).toBe(true);
     expect(ctx.embudo).toBe('en_embudo');
     expect(ctx.economicos.map((i) => i.personaId)).toEqual(['e1', 'ec1']);
