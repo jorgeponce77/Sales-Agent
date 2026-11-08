@@ -20,7 +20,10 @@ export interface Cuenta {
   clienteIdeal: Evidencia<number>[];                  // 5 criterios, valor −5..+5
 }
 export interface Influencia {
-  personaId: string; nombre: string; roles: Rol[];
+  personaId: string; nombre: string;
+  /** Cargo como lo dijo el vendedor (opcional; el nombre va sin cargo). */
+  cargo?: string;
+  roles: Rol[];
   grado: Grado | null; modo: Modo | null; calificacion: number | null;
   contactada: boolean; ultimoContacto?: string; nuevaEnPuesto: boolean;
   trDeclaracion: string | null; prioridad: Prioridad | null;

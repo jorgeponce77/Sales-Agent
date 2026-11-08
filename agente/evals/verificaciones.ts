@@ -48,8 +48,9 @@ function idioma(esc: Escenario, op: Oportunidad): Verificacion {
 function sinPersonasInventadas(esc: Escenario, op: Oportunidad): Verificacion {
   // Con espacios alrededor, la comparación es por palabras completas: "Ana" no coincide con "semana".
   const hechos = ` ${normalizar(esc.hechosOcultos)} `;
-  // Una persona registrada por cargo ("<cargo> (nombre pendiente)", regla 5) pasa si el cargo está en los hechos.
-  const comparable = (n: string): string => n.replace(/\(\s*nombre pendiente\s*\)\s*$/i, '');
+  // Se quita cualquier paréntesis antes de comparar: "<cargo> (nombre pendiente)" (regla 5) pasa si el cargo está
+  // en los hechos, y "Karina (Planificación)" se compara como "Karina".
+  const comparable = (n: string): string => n.replace(/\([^)]*\)/g, ' ');
   const inventadas = op.expediente.influencias
     .map((i) => i.nombre)
     .filter((n) => !hechos.includes(` ${normalizar(comparable(n))} `));

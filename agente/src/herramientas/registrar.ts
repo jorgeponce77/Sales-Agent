@@ -248,7 +248,7 @@ export const registrarCriterioArgano: Herramienta = segura('registrar_criterio_a
 // ---------------------------------------------------------------------------
 
 const CAMPOS_INFLUENCIA = [
-  'roles', 'grado', 'modo', 'calificacion', 'contactada', 'ultimoContacto',
+  'cargo', 'roles', 'grado', 'modo', 'calificacion', 'contactada', 'ultimoContacto',
   'nuevaEnPuesto', 'trDeclaracion', 'prioridad',
 ] as const;
 
@@ -272,6 +272,9 @@ export const registrarInfluencia: Herramienta = segura('registrar_influencia', (
 
   return aplicarEscritura(estado, `Influencia ${etiqueta}`, (exp) => {
     if (presente(input, 'contactada') && typeof input['contactada'] !== 'boolean') throw new Error('contactada: debe ser verdadero o falso');
+    if (presente(input, 'cargo') && (typeof input['cargo'] !== 'string' || input['cargo'].length > MAX_NOMBRE_INFLUENCIA)) {
+      throw new Error(`cargo: debe ser texto de máximo ${MAX_NOMBRE_INFLUENCIA} caracteres`);
+    }
     if (presente(input, 'nuevaEnPuesto') && typeof input['nuevaEnPuesto'] !== 'boolean') throw new Error('nuevaEnPuesto: debe ser verdadero o falso');
     const tr = input['trDeclaracion'];
     if (tr !== undefined && tr !== null && typeof tr !== 'string') throw new Error('trDeclaracion: debe ser texto o null');

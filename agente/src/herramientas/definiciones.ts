@@ -93,14 +93,17 @@ export const DEFINICIONES_HERRAMIENTAS: DefinicionHerramienta[] = [
     description:
       'Crea o actualiza una Influencia (persona del cliente) con su rol, grado, modo, calificación, contacto y Triunfo-Resultado. ' +
       'Úsala cuando el vendedor mencione a una persona de la cuenta o cambie algo de ella. Si ya existe (mismo personaId o nombre), solo se actualizan los campos que envíes; con personaId, un nombre nuevo reemplaza al anterior. ' +
+      '"nombre" lleva solo el nombre, tal como lo dijo el vendedor (sin cargo ni paréntesis); el cargo va en "cargo". ' +
       'Si el vendedor no sabe el nombre, regístrala por cargo: "<cargo> (nombre pendiente)". ' +
+      'Regístrala solo si el vendedor dice que esa persona existe y cumple ese rol; si solo lo supone ("creo que es el gerente general"), no la registres. ' +
       'Roles: E Económico, U Usuario, T Técnico, C Coach. Grado: A alto, M medio, B bajo. Modo: C Crecimiento, P Problema, E Equilibrio, EC Exceso de confianza. ' +
       'La calificación es un entero de -5 a -1 o de 1 a 5 (el 0 no existe).',
     input_schema: {
       type: 'object',
       properties: {
         personaId: { type: 'string', description: 'Identificador de una influencia ya registrada (opcional).' },
-        nombre: { type: 'string', maxLength: 120, description: 'Nombre de la persona (máximo 120 caracteres).' },
+        nombre: { type: 'string', maxLength: 120, description: 'Solo el nombre de la persona, como lo dijo el vendedor (máximo 120 caracteres).' },
+        cargo: { type: 'string', maxLength: 120, description: 'Cargo o área de la persona, como lo dijo el vendedor (opcional).' },
         roles: { type: 'array', items: { type: 'string', enum: ROLES }, description: 'Roles que cumple en la compra.' },
         grado: { type: ['string', 'null'], enum: [...GRADO, null], description: 'Grado de influencia.' },
         modo: { type: ['string', 'null'], enum: [...MODO, null], description: 'Modo de la persona.' },

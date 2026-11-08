@@ -2,7 +2,8 @@ import { CATALOGO_REGLAS, CONFIG_DEFAULT, construirContexto, contradiccionesPrev
 import type { Diagnostico, Evidencia, Expediente, Influencia } from 'motor-sales-agent';
 import type { ModoSesion, Oportunidad } from '../tipos.js';
 import { saludoPorHora } from '../fechas.js';
-import { INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from './base.js';
+import { idiomaDelVendedor } from '../idioma.js';
+import { ANTES_DE_ENVIAR, INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from './base.js';
 
 /** Qué significa cada bandera del motor, para que el agente la explique sin recalcularla. */
 const SIGNIFICADO: Readonly<Record<string, string>> = {
@@ -58,7 +59,8 @@ const CATALOGO_BANDERAS = [
 ].join('\n');
 
 /** Parte fija: idéntica para toda oportunidad y modo (se cachea). */
-const FIJO = `${INSTRUCCIONES_BASE}\n\n${CATALOGO_BANDERAS}\n`;
+// La revisión antes de enviar va al final, donde el modelo la ve justo antes de escribir.
+const FIJO = `${INSTRUCCIONES_BASE}\n\n${CATALOGO_BANDERAS}\n\n${ANTES_DE_ENVIAR}\n`;
 
 // ---------------------------------------------------------------------------
 // Parte variable
@@ -80,7 +82,7 @@ function ev(e: Evidencia<unknown>): string {
 
 function lineaInfluencia(i: Influencia): string {
   const partes = [
-    `${i.nombre} [id ${i.personaId}]`,
+    `${i.nombre}${i.cargo ? ` (${recortar(i.cargo)})` : ''} [id ${i.personaId}]`,
     i.roles.length > 0 ? i.roles.join(',') : 'sin rol',
     `grado ${i.grado ?? '?'}`,
     `modo ${i.modo ?? '?'}`,
@@ -191,6 +193,20 @@ function bloqueSesiones(op: Oportunidad): string[] {
   ];
 }
 
+/**
+ * Idioma en que el agente debe escribir: el del último mensaje reconocible del vendedor; si el vendedor aún no
+ * ha escrito (primer saludo), inglés solo si la ficha es de US.
+ */
+function lineaIdioma(op: Oportunidad): string {
+  const escribio = [...(op.sesionActual?.transcripcion ?? []), ...op.sesiones.flatMap((s) => s.transcripcion ?? [])]
+    .some((m) => m.rol === 'vendedor');
+  if (!escribio) {
+    const idioma = op.ficha.pais.trim().toUpperCase() === 'US' ? 'inglés' : 'español';
+    return `Idioma de tus mensajes: ${idioma} (el vendedor aún no escribe; país de la ficha ${op.ficha.pais})`;
+  }
+  return `Idioma de tus mensajes: ${idiomaDelVendedor(op) === 'en' ? 'inglés' : 'español'} (último mensaje del vendedor)`;
+}
+
 const SALUDO_EN = { 'buenos días': 'Good morning', 'buenas tardes': 'Good afternoon', 'buenas noches': 'Good evening' } as const;
 
 /** Línea de hora local y saludo para la apertura; sin una hora válida (entero 0–23), saludo neutro. */
@@ -225,6 +241,7 @@ export function construirInstrucciones(
     `Hoy: ${hoy} · Modo: ${modo} · Lente: ${lente}`,
     `Sesión: ${sesion}${mensajes}`,
     lineaHoraLocal(horaLocal),
+    lineaIdioma(op),
     `Ficha (CRM): ${f.idCRM} · ${f.cliente} · ${f.oportunidad} · ${f.pais} · ${f.lineas.join('+')} · tipo ${f.tipo ?? 'sin dato'} · etapa ${f.etapaCRM} · TCV ${f.tcv} ${f.moneda} · creada ${f.fechaCreacion} · cierre ${f.fechaCierreCRM} · RFP ${siNo(f.esRFP)} · prob. CRM ${f.probabilidadCRM === null ? '?' : `${f.probabilidadCRM}%`} · últ. act. CRM ${f.ultimaActualizacionCRM ?? '?'}`,
     '',
     ...bloqueExpediente(op.expediente, diag),

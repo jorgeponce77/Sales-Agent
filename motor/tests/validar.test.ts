@@ -119,6 +119,12 @@ describe('validarExpediente', () => {
       expect(camposConError((e) => { e.criteriosArgano[0].fuente = null; })).toContain('criteriosArgano[0].fuente');
     });
 
+    it('cargo de la influencia: opcional, texto de máximo 120 caracteres', () => {
+      expect(camposConError((e) => { e.influencias[0].cargo = 'Gerente General'; })).toEqual([]);
+      expect(camposConError((e) => { e.influencias[0].cargo = 'x'.repeat(121); })).toContain('influencias[0].cargo');
+      expect(camposConError((e) => { e.influencias[0].cargo = 7; })).toContain('influencias[0].cargo');
+    });
+
     it('etapaRegistro del criterio Argano: opcional, entero de 0 a 8', () => {
       for (const ok of [0, 3, 8]) expect(camposConError((e) => { e.criteriosArgano[0].etapaRegistro = ok; })).toEqual([]);
       for (const malo of [-1, 9, 2.5, '3', null]) {

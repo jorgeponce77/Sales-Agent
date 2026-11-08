@@ -10,6 +10,7 @@ import {
   registrarInfluencia,
 } from '../src/herramientas/registrar.js';
 import { aplicarEscritura } from '../src/herramientas/escritura.js';
+import { DEFINICIONES_HERRAMIENTAS } from '../src/herramientas/definiciones.js';
 import { CRITERIOS_INTERNOS } from '../src/instrucciones/base.js';
 import { estadoBase } from './fabrica.js';
 
@@ -325,6 +326,18 @@ describe('registrarCriterioArgano', () => {
 });
 
 describe('registrarInfluencia', () => {
+  it('el cargo va en su campo, no en el nombre (revisión 2.5)', () => {
+    const e = estadoBase();
+    expect(registrarInfluencia(e, { nombre: 'Karina', cargo: 'Jefa de Planificación', roles: ['U'] }).ok).toBe(true);
+    expect(e.oportunidad.expediente.influencias[0]).toMatchObject({ nombre: 'Karina', cargo: 'Jefa de Planificación' });
+    expect(registrarInfluencia(e, { nombre: 'Karina', cargo: 'Jefa de Planificación de Inventarios' }).ok).toBe(true);
+    expect(e.oportunidad.expediente.influencias[0]?.cargo).toBe('Jefa de Planificación de Inventarios');
+    expect(registrarInfluencia(e, { nombre: 'Otro', cargo: 5 }).ok).toBe(false);
+    const def = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'registrar_influencia');
+    expect(def?.input_schema.properties['cargo']).toBeDefined();
+    expect(def?.description).toContain('solo el nombre');
+  });
+
   it('por cargo con nombre pendiente y después el nombre real con su personaId (revisión 3)', () => {
     const e = estadoBase();
     expect(registrarInfluencia(e, { nombre: 'Director de Compras (nombre pendiente)', roles: ['T'] }).ok).toBe(true);

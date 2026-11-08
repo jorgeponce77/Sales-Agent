@@ -267,18 +267,90 @@ describe('construirInstrucciones', () => {
     });
 
     it('ningún ejemplo entre comillas tiene más de una pregunta (revisión 4)', () => {
-      const ejemplos = [...INSTRUCCIONES_BASE.matchAll(/"([^"\n]*)"/g)].map((m) => m[1] ?? '');
+      // Los ejemplos de lo que NO hay que hacer van entre «» y quedan fuera de esta comprobación.
+      const f = fijo();
+      const ejemplos = [...f.matchAll(/"([^"\n]*)"/g)].map((m) => m[1] ?? '');
       expect(ejemplos.length).toBeGreaterThan(20);
       const dobles = ejemplos.filter((t) => (t.match(/\?/g) ?? []).length > 1);
       expect(dobles).toEqual([]);
       // Tampoco listas de preguntas sueltas en una misma línea fuera de comillas (Budget, compelling event, higiene…).
-      const lineas = INSTRUCCIONES_BASE.split('\n').filter((l) => !/^\d+\. /.test(l.trim()));
-      const conVarias = lineas.filter((l) => (l.replace(/"[^"\n]*"/g, '').match(/\?/g) ?? []).length > 1);
+      const lineas = f.split('\n').filter((l) => !/^\d+\. /.test(l.trim()));
+      const conVarias = lineas.filter((l) => (l.replace(/"[^"\n]*"|«[^»\n]*»/g, '').match(/\?/g) ?? []).length > 1);
       expect(conVarias).toEqual([]);
       const alt = DEFINICIONES_HERRAMIENTAS.find((d) => d.name === 'registrar_alternativa')?.description ?? '';
       expect(alt).toContain('una sola pregunta');
       expect(alt).not.toContain('pregunta si hay una solución interna, si el presupuesto se podría ir a otra cosa y si el cliente podría no hacer nada');
     });
+  });
+
+  describe('ronda 2 de evals (2026-11-08.3)', () => {
+    const f = (): string => construir(opAlfa()).fijo;
+    const regla = (n: number): string => {
+      const t = f();
+      const i = t.indexOf(`${n}. **`, t.indexOf('## 2. Reglas de conversación'));
+      return t.slice(i, t.indexOf(`${n + 1}. **`, i));
+    };
+
+    it('una pregunta: regla 1 con opciones dentro de la misma pregunta, par mal/bien y revisión final', () => {
+      const r1 = regla(1);
+      expect(r1).toContain('exactamente un "?"');
+      expect(r1).toContain('"¿Quién libera el presupuesto: Héctor, el director general o el CFO?"');
+      expect(r1).toMatch(/Mal: «[^»]*\?[^»]*\?[^»]*»/);
+      expect(r1).toContain('el siguiente turno');
+      const ultima = f().trimEnd().split('\n').at(-1) ?? '';
+      expect(ultima).toContain('exactamente un "?"');
+      expect(ultima).toMatch(/opciones/);
+    });
+
+    it('idioma: el del último mensaje del vendedor; solo el resumen de cerrar_sesion en español; saludo por país', () => {
+      const r8 = regla(8);
+      expect(r8).toContain('idioma del último mensaje del vendedor');
+      expect(r8).toContain('aunque el contexto, los resultados de las herramientas y los resúmenes estén en español');
+      expect(r8).toMatch(/US/);
+      const revision = f().slice(f().lastIndexOf('## Antes de enviar'));
+      expect(revision).toContain('idioma del último mensaje del vendedor');
+    });
+
+    it('sin jerga interna y sin diagnóstico a media conversación', () => {
+      const t = f();
+      const jerga = t.slice(t.indexOf('10. **'), t.indexOf('### Límites duros'));
+      for (const x of ['motor', 'engine', 'ids de bandera', 'letras de rol', '"tu Coach está muy a favor"', '"la etapa en el CRM va adelantada"', 'cierre']) {
+        expect(jerga).toContain(x);
+      }
+      expect(t.slice(t.lastIndexOf('## Antes de enviar'))).toMatch(/jerga|motor/);
+    });
+
+    it('no registra como influencia una conjetura del vendedor (E2) y el nombre va sin cargo (E4)', () => {
+      const r5 = regla(5);
+      expect(r5).toContain('"creo que es el gerente general o los dueños"');
+      expect(r5).toMatch(/no registres una influencia/);
+      expect(r5).toContain('`cargo`');
+      expect(r5).toContain('`nombre` lleva solo el nombre');
+    });
+  });
+
+  it('contexto: idioma para responder (último mensaje del vendedor o país de la ficha)', () => {
+    expect(construir(opAlfa()).variable).toContain('Idioma de tus mensajes: español (el vendedor aún no escribe; país de la ficha MX)');
+    const us = crearOportunidad(fichaBase({ pais: 'US' }));
+    expect(construir(us).variable).toContain('Idioma de tus mensajes: inglés (el vendedor aún no escribe; país de la ficha US)');
+    const op = opAlfa();
+    op.sesionActual = {
+      modo: 'calificar', inicio: HOY, turnosVendedor: 1, versionInstrucciones: VERSION_INSTRUCCIONES, historial: [],
+      transcripcion: [
+        { rol: 'agente', texto: '¡Buenos días! ¿Cuál es el estatus del negocio?', fecha: HOY },
+        { rol: 'vendedor', texto: 'The client chose us and we are finishing the SOW with the team.', fecha: HOY },
+      ],
+    };
+    expect(construir(op).variable).toContain('Idioma de tus mensajes: inglés (último mensaje del vendedor)');
+  });
+
+  it('contexto: el cargo aparece junto a la influencia', () => {
+    const op = opAlfa();
+    op.expediente.influencias.push({
+      personaId: 'p-karina', nombre: 'Karina', cargo: 'Jefa de Planificación', roles: ['U'], grado: null, modo: null,
+      calificacion: null, contactada: true, nuevaEnPuesto: false, trDeclaracion: null, prioridad: null,
+    });
+    expect(construir(op).variable).toContain('- Karina (Jefa de Planificación) [id p-karina]');
   });
 
   it('contexto: criterios de la etapa actual y contradicciones de etapas anteriores', () => {
@@ -307,7 +379,7 @@ describe('construirInstrucciones', () => {
   });
 
   it('version', () => {
-    expect(VERSION_INSTRUCCIONES).toBe('2026-11-08.2');
+    expect(VERSION_INSTRUCCIONES).toBe('2026-11-08.3');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
   });
 });

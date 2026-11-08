@@ -146,6 +146,10 @@ export function validarExpediente(exp: Expediente): ErrorValidacion[] {
       raw['roles'].forEach((r, j) => revisarLista(`${campo}.roles[${j}]`, r, ROLES, false));
     }
     revisarFecha(`${campo}.ultimoContacto`, raw['ultimoContacto']);
+    const cargo = raw['cargo'];
+    if (cargo !== undefined && (typeof cargo !== 'string' || cargo.length > 120)) {
+      error(`${campo}.cargo`, 'El cargo debe ser texto de máximo 120 caracteres');
+    }
   });
 
   // Alternativas

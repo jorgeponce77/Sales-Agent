@@ -106,6 +106,12 @@ describe('verificar: sin_personas_inventadas', () => {
     expect(v.detalle).toContain('Director de Marketing (nombre pendiente)');
   });
 
+  it('quita cualquier paréntesis del nombre antes de comparar (revisión 2.5)', () => {
+    expect(por(E1, conInfluencia('Héctor Salgado (Operaciones)'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(E1, conInfluencia('Raúl Ibarra (Director de TI)'), 'sin_personas_inventadas').ok).toBe(true);
+    expect(por(E1, conInfluencia('Laura Méndez (CFO)'), 'sin_personas_inventadas').ok).toBe(false);
+  });
+
   it('sin influencias pasa', () => {
     expect(por(E1, opCon([msg('agente', ES)]), 'sin_personas_inventadas').ok).toBe(true);
   });
