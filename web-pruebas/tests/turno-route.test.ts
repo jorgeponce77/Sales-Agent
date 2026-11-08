@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ejecutarTurno, iniciarSesion, MODELO_DEFAULT } from 'agente-sales-agent';
+import { ejecutarTurno, horaLocalPorPais, iniciarSesion, MODELO_DEFAULT } from 'agente-sales-agent';
 import type { ResultadoTurno } from 'agente-sales-agent';
 import { calcularDiagnostico } from 'motor-sales-agent';
 import { obtenerCliente } from '../lib/clienteServidor';
@@ -15,6 +15,7 @@ vi.mock('agente-sales-agent', async (importarOriginal) => {
     ...original,
     iniciarSesion: vi.fn(original.iniciarSesion),
     ejecutarTurno: vi.fn(original.ejecutarTurno),
+    horaLocalPorPais: vi.fn(original.horaLocalPorPais),
   };
 });
 
@@ -307,6 +308,19 @@ describe('presupuesto de tiempo (Importante 4)', () => {
     await llamar({ accion: 'mensaje', oportunidad: primera.json.oportunidad, mensaje: 'hola' });
     expect(vi.mocked(iniciarSesion).mock.calls[0]?.[2]).toMatchObject({ limiteMs: 240_000 });
     expect(vi.mocked(ejecutarTurno).mock.calls[0]?.[2]).toMatchObject({ limiteMs: 240_000 });
+  });
+});
+
+describe('hora local para el saludo', () => {
+  it('calcula la hora con la zona del país de la ficha y la pasa al iniciar y en cada turno', async () => {
+    vi.mocked(horaLocalPorPais).mockReturnValue(7);
+    const primera = await llamar({ accion: 'iniciar', ficha: fichaBase({ pais: 'CO' }) });
+    expect(primera.estado).toBe(200);
+    expect(vi.mocked(horaLocalPorPais)).toHaveBeenCalledWith('CO');
+    expect(vi.mocked(iniciarSesion).mock.calls[0]?.[2]).toMatchObject({ horaLocal: 7 });
+    vi.mocked(horaLocalPorPais).mockReturnValue(20);
+    await llamar({ accion: 'mensaje', oportunidad: primera.json.oportunidad, mensaje: 'hola' });
+    expect(vi.mocked(ejecutarTurno).mock.calls[0]?.[2]).toMatchObject({ horaLocal: 20 });
   });
 });
 

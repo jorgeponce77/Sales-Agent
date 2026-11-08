@@ -1,4 +1,4 @@
-import { crearOportunidad, ejecutarTurno, ESCENARIOS, iniciarSesion, validarFicha } from 'agente-sales-agent';
+import { crearOportunidad, ejecutarTurno, ESCENARIOS, horaLocalPorPais, iniciarSesion, validarFicha } from 'agente-sales-agent';
 import type { Ficha, ModoSesion, Oportunidad, OpcionesTurno } from 'agente-sales-agent';
 import { validarExpediente } from 'motor-sales-agent';
 import { obtenerCliente } from '../../../lib/clienteServidor';
@@ -79,6 +79,8 @@ export async function POST(req: Request): Promise<Response> {
       hoy,
       modelo: process.env.MODELO_AGENTE || undefined,
       limiteMs: LIMITE_TURNO_MS,
+      // Hora del vendedor para el saludo, en la zona del país de la ficha (lo decide el servidor, no el navegador).
+      horaLocal: horaLocalPorPais(oportunidad.ficha.pais),
       registrarError: (e) => console.error('[api/turno] fallo de la API', resumenError(e)),
     };
     const resultado = accion === 'iniciar'

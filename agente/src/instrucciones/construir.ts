@@ -1,6 +1,7 @@
 import { CATALOGO_REGLAS, CONFIG_DEFAULT, construirContexto } from 'motor-sales-agent';
 import type { Diagnostico, Evidencia, Expediente, Influencia } from 'motor-sales-agent';
 import type { ModoSesion, Oportunidad } from '../tipos.js';
+import { saludoPorHora } from '../fechas.js';
 import { INSTRUCCIONES_BASE, VERSION_INSTRUCCIONES } from './base.js';
 
 /** Qué significa cada bandera del motor, para que el agente la explique sin recalcularla. */
@@ -174,16 +175,26 @@ function bloqueSesiones(op: Oportunidad): string[] {
   ];
 }
 
+/** Línea de hora local y saludo para la apertura; sin una hora válida (entero 0–23), saludo neutro. */
+function lineaHoraLocal(horaLocal: number | undefined): string {
+  if (horaLocal === undefined || !Number.isInteger(horaLocal) || horaLocal < 0 || horaLocal > 23) {
+    return 'Hora local del vendedor: desconocida → saludo neutro ("Hola, …")';
+  }
+  return `Hora local del vendedor: ${String(horaLocal).padStart(2, '0')} h → saludo: ${saludoPorHora(horaLocal)}`;
+}
+
 /**
  * Instrucciones para un turno: `fijo` (el system, cacheable, igual para toda oportunidad) y `variable`
  * (hoy, modo, lente, ficha, expediente resumido, diagnóstico y memoria), que va en el mensaje del turno.
- * `diag` es el diagnóstico vigente, calculado al inicio del turno.
+ * `diag` es el diagnóstico vigente, calculado al inicio del turno. `horaLocal` (0–23) es la hora del
+ * vendedor para el saludo; va solo en la parte variable.
  */
 export function construirInstrucciones(
   op: Oportunidad,
   modo: ModoSesion,
   hoy: string,
   diag: Diagnostico,
+  horaLocal?: number,
 ): { fijo: string; variable: string; version: string } {
   const { lente } = construirContexto(op.expediente, hoy, CONFIG_DEFAULT);
   const f = op.ficha;
@@ -195,6 +206,7 @@ export function construirInstrucciones(
   const lineas = [
     `Hoy: ${hoy} · Modo: ${modo} · Lente: ${lente}`,
     `Sesión: ${sesion}${mensajes}`,
+    lineaHoraLocal(horaLocal),
     `Ficha (CRM): ${f.idCRM} · ${f.cliente} · ${f.oportunidad} · ${f.pais} · ${f.lineas.join('+')} · tipo ${f.tipo ?? 'sin dato'} · etapa ${f.etapaCRM} · TCV ${f.tcv} ${f.moneda} · creada ${f.fechaCreacion} · cierre ${f.fechaCierreCRM} · RFP ${siNo(f.esRFP)} · prob. CRM ${f.probabilidadCRM === null ? '?' : `${f.probabilidadCRM}%`} · últ. act. CRM ${f.ultimaActualizacionCRM ?? '?'}`,
     '',
     ...bloqueExpediente(op.expediente, diag),

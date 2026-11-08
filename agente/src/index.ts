@@ -1,6 +1,6 @@
 export * from './tipos.js';
 export { validarFicha, convertirAUSD, fichaAExpediente, crearOportunidad } from './ficha.js';
-export { hoyEnMexico } from './fechas.js';
+export { horaLocalPorPais, hoyEnMexico, saludoPorHora } from './fechas.js';
 export { idiomaDe, idiomaDelVendedor } from './idioma.js';
 export type { Idioma } from './idioma.js';
 export { crearClienteAnthropic, MODELO_DEFAULT } from './conversacion/cliente.js';

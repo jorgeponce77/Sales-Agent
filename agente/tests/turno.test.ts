@@ -83,6 +83,13 @@ describe('iniciarSesion', () => {
     expect(r.diagnostico).toEqual(r.oportunidad.ultimoDiagnostico);
   });
 
+  it('horaLocal_llega_al_contexto_del_turno', async () => {
+    const cliente = crearClienteFalso([texto('Buenas tardes.')]);
+    await iniciarSesion(opNueva(), 'calificar', { cliente, hoy: HOY, horaLocal: 16 });
+    const contexto = bloques(cliente.llamadas[0]?.messages.at(-1) as MensajeApi).find(esContexto);
+    expect(contexto?.text).toContain('Hora local del vendedor: 16 h → saludo: buenas tardes');
+  });
+
   it('cerrada_no_llama_modelo', async () => {
     const cliente = crearClienteFalso([texto('no debería usarse')]);
     const op = crearOportunidad(fichaBase({ etapaCRM: 7 }));

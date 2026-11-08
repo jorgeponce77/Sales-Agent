@@ -141,6 +141,23 @@ describe('construirInstrucciones', () => {
     expect((inf?.input_schema.properties['nombre'] as { maxLength?: number }).maxLength).toBe(120);
   });
 
+  it('hora_local_y_saludo_en_el_contexto', () => {
+    const op = opAlfa();
+    const diag = calcularDiagnostico(op.expediente, HOY);
+    const manana = construirInstrucciones(op, 'calificar', HOY, diag, 9).variable;
+    expect(manana).toContain('Hora local del vendedor: 09 h → saludo: buenos días');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 15).variable).toContain('Hora local del vendedor: 15 h → saludo: buenas tardes');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 22).variable).toContain('Hora local del vendedor: 22 h → saludo: buenas noches');
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 0).variable).toContain('Hora local del vendedor: 00 h → saludo: buenas noches');
+    // Sin hora (o con una hora inválida), saludo neutro.
+    for (const hora of [undefined, 24, -1, 9.5, Number.NaN]) {
+      const v = construirInstrucciones(op, 'calificar', HOY, diag, hora).variable;
+      expect(v).toContain('Hora local del vendedor: desconocida → saludo neutro ("Hola, …")');
+    }
+    // La hora no entra a la parte fija (cacheable).
+    expect(construirInstrucciones(op, 'calificar', HOY, diag, 9).fijo).toBe(construir(op).fijo);
+  });
+
   it('version', () => {
     expect(VERSION_INSTRUCCIONES).toBe('2026-11-02.4');
     expect(construir(opAlfa()).version).toBe(VERSION_INSTRUCCIONES);
